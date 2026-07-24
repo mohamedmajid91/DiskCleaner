@@ -19,14 +19,17 @@ public partial class MainForm
         _lblUnin = new Label { ForeColor = Theme.Muted, Location = new(396, 14), Size = new(196, 20) };
 
         _lvApps = MakeList(12, 46, 576, 210);
+        _lvApps.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         _aName = _lvApps.Columns.Add("Name", 220); _aPub = _lvApps.Columns.Add("Publisher", 150);
         _aVer = _lvApps.Columns.Add("Version", 90); _aSize = _lvApps.Columns.Add("Size", 100);
 
         _lvLeft = MakeList(12, 264, 576, 182);
         _lvLeft.CheckBoxes = true;
+        _lvLeft.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         _lType = _lvLeft.Columns.Add("Type", 80); _lSize = _lvLeft.Columns.Add("Size", 90); _lPath = _lvLeft.Columns.Add("Path", 390);
 
         _btnRemoveLeft = MakeBtn(12, 452, 576, Theme.Purple, Theme.PurpleH); _btnRemoveLeft.Size = new(576, 40);
+        _btnRemoveLeft.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
 
         _btnRefApps.Click    += (_, _) => RefreshApps();
         _btnUninstall.Click  += (_, _) => DoUninstall();

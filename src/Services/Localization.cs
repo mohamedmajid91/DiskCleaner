@@ -128,6 +128,27 @@ public static class Loc
         ["kindFile"]     = ("File", "ملف"),
         ["kindDir"]      = ("Folder", "مجلد"),
         ["kindReg"]      = ("Registry", "رجستري"),
+
+        // المستخدمون والمجموعات
+        ["tabUsers"]     = ("Users & Groups", "المستخدمون والمجموعات"),
+        ["newUser"]      = ("New user", "مستخدم جديد"),
+        ["delUser"]      = ("Delete", "حذف"),
+        ["resetPwd"]     = ("Reset password", "تغيير كلمة السر"),
+        ["enableUser"]   = ("Enable", "تفعيل"),
+        ["disableUser"]  = ("Disable", "تعطيل"),
+        ["colFullName"]  = ("Full name", "الاسم الكامل"),
+        ["colNeverExp"]  = ("Never expires", "لا تنتهي"),
+        ["colDesc"]      = ("Description", "الوصف"),
+        ["promptUserName"]= ("New user name:", "اسم المستخدم الجديد:"),
+        ["promptPassword"]= ("Password:", "كلمة السر:"),
+        ["promptFullName"]= ("Full name (optional):", "الاسم الكامل (اختياري):"),
+        ["confirmDelUser"]= ("Delete this local user account?", "حذف حساب المستخدم المحلي هذا؟"),
+        ["group"]        = ("Group", "المجموعة"),
+        ["members"]      = ("Members", "الأعضاء"),
+        ["addMember"]    = ("Add selected user", "إضافة المستخدم المحدد"),
+        ["removeMember"] = ("Remove selected member", "إزالة العضو المحدد"),
+        ["done"]         = ("Done.", "تم."),
+        ["yes2"]         = ("Yes", "نعم"),
     };
 
     /// <summary>يرجّع النص حسب اللغة الحالية.</summary>

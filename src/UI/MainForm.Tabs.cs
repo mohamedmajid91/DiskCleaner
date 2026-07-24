@@ -41,7 +41,9 @@ public partial class MainForm
 
     private CancellationTokenSource? _scanCts;
 
-    private static void StyleList(ListView lv) { lv.View = View.Details; lv.FullRowSelect = true; lv.BackColor = Theme.Panel; lv.ForeColor = Theme.TextCol; }
+    private static readonly AnchorStyles Fill = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+
+    private static void StyleList(ListView lv) { lv.View = View.Details; lv.FullRowSelect = true; lv.BackColor = Theme.Panel; lv.ForeColor = Theme.TextCol; lv.Anchor = Fill; }
 
     private void FillDrives(ComboBox c)
     {

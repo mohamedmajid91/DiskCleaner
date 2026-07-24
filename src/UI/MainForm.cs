@@ -25,7 +25,7 @@ public partial class MainForm : Form
     private System.Windows.Forms.Timer _ramTimer = null!;
 
     private TabControl _tabs = null!;
-    private TabPage _tpClean = null!, _tpLarge = null!, _tpDup = null!, _tpStartup = null!, _tpProc = null!, _tpSched = null!, _tpHistory = null!, _tpUninstall = null!;
+    private TabPage _tpClean = null!, _tpLarge = null!, _tpDup = null!, _tpStartup = null!, _tpProc = null!, _tpSched = null!, _tpHistory = null!, _tpUninstall = null!, _tpUsers = null!;
 
     private int _ramPct;
     private bool _analyzed;
@@ -47,12 +47,14 @@ public partial class MainForm : Form
         Text = "Disk & RAM Cleaner";
         ClientSize = new Size(624, 648);
         StartPosition = FormStartPosition.CenterScreen;
-        FormBorderStyle = FormBorderStyle.FixedSingle;
-        MaximizeBox = false;
+        FormBorderStyle = FormBorderStyle.Sizable;
+        MaximizeBox = true;
+        MinimumSize = new Size(640, 700);
         BackColor = Theme.Dark; ForeColor = Theme.TextCol; Font = Theme.Main;
         try { Icon = Icon.ExtractAssociatedIcon(App.ExePath); } catch { }
 
-        _header = new Panel { Location = new(0, 0), Size = new(624, 56) };
+        _header = new Panel { Location = new(0, 0), Size = new(624, 56),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
         _header.Paint += (_, e) =>
         {
             var r = _header.ClientRectangle;
@@ -60,6 +62,7 @@ public partial class MainForm : Form
             using var b = new LinearGradientBrush(r, Theme.Accent, Theme.Purple, 0f);
             e.Graphics.FillRectangle(b, r);
         };
+        _header.Resize += (_, _) => _header.Invalidate();
         Controls.Add(_header);
 
         _title = new Label { Font = Theme.TitleFont, ForeColor = Theme.TextCol, BackColor = Color.Transparent,
@@ -67,12 +70,14 @@ public partial class MainForm : Form
         _header.Controls.Add(_title);
 
         _btnLang = new Button { Size = new(88, 30), Location = new(516, 13), FlatStyle = FlatStyle.Flat,
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
             BackColor = Color.Transparent, ForeColor = Theme.TextCol, Font = Theme.Main, Cursor = Cursors.Hand };
         _btnLang.FlatAppearance.BorderColor = Color.White; _btnLang.FlatAppearance.BorderSize = 1;
         _btnLang.Click += (_, _) => { Loc.Lang = Loc.Lang == "ar" ? "en" : "ar"; ApplyLanguage(); SaveSettings(); };
         _header.Controls.Add(_btnLang);
 
-        _tabs = new TabControl { Location = new(8, 62), Size = new(608, 548) };
+        _tabs = new TabControl { Location = new(8, 62), Size = new(608, 548),
+            Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right };
         Controls.Add(_tabs);
 
         _tpClean     = new TabPage();
@@ -83,7 +88,8 @@ public partial class MainForm : Form
         _tpProc      = new TabPage();
         _tpSched     = new TabPage();
         _tpHistory   = new TabPage();
-        foreach (var tp in new[] { _tpClean, _tpLarge, _tpDup, _tpUninstall, _tpStartup, _tpProc, _tpSched, _tpHistory })
+        _tpUsers     = new TabPage();
+        foreach (var tp in new[] { _tpClean, _tpLarge, _tpDup, _tpUninstall, _tpStartup, _tpProc, _tpUsers, _tpSched, _tpHistory })
         { tp.BackColor = Theme.Dark; tp.UseVisualStyleBackColor = false; _tabs.TabPages.Add(tp); }
 
         BuildCleanTab(_tpClean);
@@ -92,16 +98,18 @@ public partial class MainForm : Form
         BuildUninstallTab(_tpUninstall);
         BuildStartupTab(_tpStartup);
         BuildProcessTab(_tpProc);
+        BuildUsersTab(_tpUsers);
         BuildScheduleTab(_tpSched);
         BuildHistoryTab(_tpHistory);
 
         _lnkUpdate = new LinkLabel { LinkColor = Theme.Link, ActiveLinkColor = Theme.AccentH, Font = Theme.Main,
-            Location = new(12, 618), Size = new(240, 22) };
+            Location = new(12, 618), Size = new(240, 22), Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
         _lnkUpdate.LinkClicked += async (_, _) => await CheckUpdate();
         Controls.Add(_lnkUpdate);
 
         _credit = new Label { Text = $"v{App.Version}  -  by {App.Author}", ForeColor = Theme.Muted,
-            Font = new Font("Segoe UI", 8F), TextAlign = ContentAlignment.MiddleRight, Location = new(360, 618), Size = new(252, 22) };
+            Font = new Font("Segoe UI", 8F), TextAlign = ContentAlignment.MiddleRight, Location = new(360, 618), Size = new(252, 22),
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Right };
         Controls.Add(_credit);
 
         _ramTimer = new System.Windows.Forms.Timer { Interval = 600000 };
@@ -116,14 +124,17 @@ public partial class MainForm : Form
     // ===================== تبويب التنظيف =====================
     private void BuildCleanTab(TabPage tp)
     {
-        _info = new Label { ForeColor = Theme.Muted, Location = new(12, 8), Size = new(576, 20) };
+        var wideLR = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+
+        _info = new Label { ForeColor = Theme.Muted, Location = new(12, 8), Size = new(576, 20), Anchor = wideLR };
         tp.Controls.Add(_info);
 
-        _ramBar = new Panel { Location = new(12, 30), Size = new(576, 18) };
+        _ramBar = new Panel { Location = new(12, 30), Size = new(576, 18), Anchor = wideLR };
         _ramBar.Paint += RamBar_Paint;
+        _ramBar.Resize += (_, _) => _ramBar.Invalidate();
         tp.Controls.Add(_ramBar);
 
-        _catPanel = new Panel { Location = new(12, 54), Size = new(576, 208), BackColor = Theme.Panel, AutoScroll = true };
+        _catPanel = new Panel { Location = new(12, 54), Size = new(576, 208), BackColor = Theme.Panel, AutoScroll = true, Anchor = wideLR };
         tp.Controls.Add(_catPanel);
         int y = 10;
         foreach (var c in _cats)
@@ -137,17 +148,18 @@ public partial class MainForm : Form
             y += 30;
         }
 
-        _total = new Label { Font = Theme.Bold, ForeColor = Theme.AccentH, Location = new(12, 268), Size = new(576, 22) };
+        _total = new Label { Font = Theme.Bold, ForeColor = Theme.AccentH, Location = new(12, 268), Size = new(576, 22), Anchor = wideLR };
         tp.Controls.Add(_total);
 
-        _chart = new Panel { Location = new(12, 294), Size = new(576, 22) };
+        _chart = new Panel { Location = new(12, 294), Size = new(576, 22), Anchor = wideLR };
         _chart.Paint += Chart_Paint;
+        _chart.Resize += (_, _) => _chart.Invalidate();
         tp.Controls.Add(_chart);
 
-        _progress = new ProgressBar { Location = new(12, 322), Size = new(576, 14), Style = ProgressBarStyle.Continuous };
+        _progress = new ProgressBar { Location = new(12, 322), Size = new(576, 14), Style = ProgressBarStyle.Continuous, Anchor = wideLR };
         tp.Controls.Add(_progress);
 
-        _status = new Label { ForeColor = Theme.Muted, Location = new(12, 340), Size = new(576, 20) };
+        _status = new Label { ForeColor = Theme.Muted, Location = new(12, 340), Size = new(576, 20), Anchor = wideLR };
         tp.Controls.Add(_status);
 
         _btnAnalyze = MakeBtn(12, 366, 184, Theme.Gray, Theme.GrayH);
@@ -260,10 +272,12 @@ public partial class MainForm : Form
         _tpClean.Text = Loc.T("tabClean"); _tpLarge.Text = Loc.T("tabLarge"); _tpDup.Text = Loc.T("tabDup");
         _tpUninstall.Text = Loc.T("tabUninstall");
         _tpStartup.Text = Loc.T("tabStartup"); _tpProc.Text = Loc.T("tabProc"); _tpSched.Text = Loc.T("tabSchedule"); _tpHistory.Text = Loc.T("tabHistory");
+        _tpUsers.Text = Loc.T("tabUsers");
         foreach (var c in _cats) _checks[c.Key].Text = c.Name(Loc.Lang);
         _total.Text = _analyzed ? $"{Loc.T("totalClean")}: {Theme.FormatSize(_lastTotal)}" : Loc.T("pressAnalyze");
         ApplyTabsLanguage();
         ApplyUninstallLanguage();
+        ApplyUsersLanguage();
         UpdateHeader();
         ResumeLayout(); Refresh();
     }
