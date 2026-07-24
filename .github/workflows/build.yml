@@ -1,0 +1,55 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ps2exe
+        shell: powershell
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name ps2exe -Force -Scope CurrentUser
+
+      - name: Build EXE
+        shell: powershell
+        run: |
+          $ver = "${{ github.ref_name }}".TrimStart('v')
+          Import-Module ps2exe
+          $a = @{
+            inputFile   = 'CleanApp.ps1'
+            outputFile  = 'DiskCleaner.exe'
+            noConsole   = $true
+            requireAdmin= $true
+            title       = 'Disk & RAM Cleaner'
+            description = 'Disk & RAM Cleaner by Mohammed Majid'
+            company     = 'Mohammed Majid'
+            product     = 'Disk Cleaner'
+            copyright   = '(c) 2026 Mohammed Majid'
+            version     = $ver
+          }
+          if (Test-Path 'icon.ico') { $a['iconFile'] = 'icon.ico' }
+          Invoke-ps2exe @a
+          if (-not (Test-Path 'DiskCleaner.exe')) { throw 'Build failed' }
+
+      - name: Generate SHA256 checksum
+        shell: powershell
+        run: |
+          (Get-FileHash 'DiskCleaner.exe' -Algorithm SHA256).Hash | Out-File 'DiskCleaner.exe.sha256' -Encoding ascii
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            DiskCleaner.exe
+            DiskCleaner.exe.sha256

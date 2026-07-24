@@ -4,19 +4,19 @@
   -----------------------------------------------------------------------------
   * Bilingual (Arabic / English) with live language toggle
   * Safe: never touches personal files (Downloads / Documents / Desktop)
-  * Analyzes sizes first, then you choose and clean
-  * Frees RAM cache (working sets + standby list)
-  * Built-in GitHub update check
+  * Disk cache cleanup + RAM release (working sets + standby list)
+  * Settings persistence, logging, restore points
+  * Self-updating from GitHub Releases
   -----------------------------------------------------------------------------
   Author : Mohammed Majid
   Repo   : https://github.com/mohamedmajid91/DiskCleaner
 ===============================================================================
 #>
 
-# ==== إعدادات التحديث - عدّل هذين السطرين بعد إنشاء مستودع GitHub ============
-$RepoOwner  = "mohamedmajid91"           # اسم مستخدم GitHub
+# ==== إعدادات التحديث =======================================================
+$RepoOwner  = "mohamedmajid91"
 $RepoName   = "DiskCleaner"
-$AppVersion = "1.3.1"
+$AppVersion = "1.4.0"
 # ============================================================================
 
 # --- رفع الصلاحيات تلقائياً --------------------------------------------------
@@ -33,6 +33,14 @@ $ErrorActionPreference = 'SilentlyContinue'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
+
+# --- مجلد البيانات: الإعدادات + السجل ---------------------------------------
+$DataDir      = Join-Path $env:APPDATA 'DiskCleaner'
+if (-not (Test-Path $DataDir)) { New-Item -ItemType Directory -Path $DataDir -Force | Out-Null }
+$SettingsFile = Join-Path $DataDir 'settings.json'
+$LogFile      = Join-Path $DataDir 'log.txt'
+function Write-Log($m) { try { Add-Content -Path $LogFile -Value ("{0}  {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m) } catch {} }
+Write-Log "=== Started v$AppVersion ==="
 
 # --- محرّك تحرير الذاكرة (Working Sets + Standby List) ----------------------
 Add-Type -TypeDefinition @"
@@ -80,6 +88,7 @@ $T = @{
     freeRam      = @{ ar='تحرير الذاكرة (RAM)';   en='Free RAM' }
     close        = @{ ar='إغلاق';                 en='Close' }
     autoRam      = @{ ar='تحرير الرام تلقائياً كل 10 دقائق (طالما البرنامج مفتوح)'; en='Auto-free RAM every 10 min (while app is open)' }
+    restore      = @{ ar='إنشاء نقطة استعادة قبل التنظيف'; en='Create a restore point before cleaning' }
     totalClean   = @{ ar='المجموع القابل للتنظيف'; en='Total cleanable' }
     pressAnalyze = @{ ar='اضغط (تحليل) لحساب الأحجام'; en='Press (Analyze) to calculate sizes' }
     analyzing    = @{ ar='جاري تحليل';            en='Analyzing' }
@@ -88,6 +97,7 @@ $T = @{
     doneClean    = @{ ar='خلص التنظيف.';          en='Cleaning done.' }
     freeingRam   = @{ ar='جاري تحرير الذاكرة...'; en='Freeing RAM...' }
     ramDone      = @{ ar='تم تحرير الذاكرة.';     en='RAM freed.' }
+    restoring    = @{ ar='جاري إنشاء نقطة استعادة...'; en='Creating restore point...' }
     autoOn       = @{ ar='التحرير التلقائي مُفعّل (كل 10 دقائق).'; en='Auto-free enabled (every 10 min).' }
     autoOff      = @{ ar='التحرير التلقائي متوقّف.'; en='Auto-free disabled.' }
     noSelect     = @{ ar='ما اخترت ولا فئة.';     en='No category selected.' }
@@ -106,8 +116,10 @@ $T = @{
     updTitle     = @{ ar='التحديثات';             en='Updates' }
     updAvail     = @{ ar='يتوفّر إصدار جديد';     en='A new version is available' }
     updLatest    = @{ ar='أنت على أحدث إصدار.';   en='You are on the latest version.' }
-    updFail      = @{ ar='تعذّر التحقق من التحديثات (تأكد من الإنترنت وإعدادات المستودع).'; en='Could not check for updates (check internet / repo settings).' }
-    updDownload  = @{ ar='هل تريد فتح صفحة التنزيل؟'; en='Open the download page?' }
+    updFail      = @{ ar='تعذّر التحقق من التحديثات (تأكد من الإنترنت).'; en='Could not check for updates (check your internet).' }
+    updInstall   = @{ ar='هل تريد تنزيل وتثبيت التحديث الآن؟ سيُغلق البرنامج ويعيد التشغيل.'; en='Download and install the update now? The app will restart.' }
+    downloading  = @{ ar='جاري تنزيل التحديث...'; en='Downloading update...' }
+    updReady     = @{ ar='تم التنزيل، جاري التثبيت وإعادة التشغيل...'; en='Downloaded. Installing and restarting...' }
     langBtn      = @{ ar='English';               en='عربي' }
 }
 function L($k) { $T[$k][$script:Lang] }
@@ -116,12 +128,18 @@ function L($k) { $T[$k][$script:Lang] }
 #  فئات التنظيف (كلها آمنة) - الأسماء ثنائية اللغة
 # ============================================================================
 $LU = $env:LOCALAPPDATA
+$LL = Join-Path $env:USERPROFILE 'AppData\LocalLow'
+$RO = $env:APPDATA
 $Categories = [ordered]@{
     'temp'        = @{ Name=@{ar='ملفات مؤقتة (Temp)';en='Temporary files'}; Paths=@("$env:TEMP","$LU\Temp","C:\Windows\Temp","C:\Windows\Prefetch") }
     'winupdate'   = @{ Name=@{ar='كاش تحديثات ويندوز';en='Windows Update cache'}; Paths=@("C:\Windows\SoftwareDistribution\Download"); Service=@('wuauserv','bits') }
     'chrome'      = @{ Name=@{ar='كاش متصفح Chrome';en='Chrome cache'}; Paths=@("$LU\Google\Chrome\User Data\Default\Cache","$LU\Google\Chrome\User Data\Default\Code Cache","$LU\Google\Chrome\User Data\Default\GPUCache") }
     'edge'        = @{ Name=@{ar='كاش متصفح Edge';en='Edge cache'}; Paths=@("$LU\Microsoft\Edge\User Data\Default\Cache","$LU\Microsoft\Edge\User Data\Default\Code Cache","$LU\Microsoft\Edge\User Data\Default\GPUCache") }
     'firefox'     = @{ Name=@{ar='كاش متصفح Firefox';en='Firefox cache'}; Dynamic={ $ff="$LU\Mozilla\Firefox\Profiles"; if(Test-Path $ff){ Get-ChildItem $ff -Directory | ForEach-Object { Join-Path $_.FullName 'cache2' } } } }
+    'teams'       = @{ Name=@{ar='كاش Microsoft Teams';en='Microsoft Teams cache'}; Paths=@("$RO\Microsoft\Teams\Cache","$RO\Microsoft\Teams\Code Cache","$RO\Microsoft\Teams\GPUCache","$LU\Packages\MSTeams_8wekyb3d8bbwe\LocalCache") }
+    'discord'     = @{ Name=@{ar='كاش Discord';en='Discord cache'}; Paths=@("$RO\discord\Cache","$RO\discord\Code Cache","$RO\discord\GPUCache") }
+    'nvidia'      = @{ Name=@{ar='كاش كرت NVIDIA';en='NVIDIA shader cache'}; Paths=@("$LU\NVIDIA\DXCache","$LU\NVIDIA\GLCache","$LL\NVIDIA\PerDriverVersion\DXCache") }
+    'directx'     = @{ Name=@{ar='كاش DirectX';en='DirectX shader cache'}; Paths=@("$LU\D3DSCache") }
     'thumbnails'  = @{ Name=@{ar='كاش الصور المصغّرة';en='Thumbnail cache'}; Files=@("$LU\Microsoft\Windows\Explorer\thumbcache_*.db") }
     'crashdumps'  = @{ Name=@{ar='تقارير الأخطاء والكراش';en='Crash dumps & error reports'}; Paths=@("C:\ProgramData\Microsoft\Windows\WER\ReportQueue","C:\ProgramData\Microsoft\Windows\WER\ReportArchive","C:\Windows\Minidump"); Files=@("C:\Windows\MEMORY.DMP") }
     'recyclebin'  = @{ Name=@{ar='سلة المحذوفات';en='Recycle Bin'}; RecycleBin=$true }
@@ -178,19 +196,51 @@ function Invoke-Clean($key,$cat) {
     }
     if ($cat.Service) { Start-Service $cat.Service -EA SilentlyContinue }
 }
+
+# --- الإعدادات (حفظ/تحميل) --------------------------------------------------
+function Load-Settings { try { if(Test-Path $SettingsFile){ return Get-Content $SettingsFile -Raw -Encoding UTF8 | ConvertFrom-Json } } catch {} ; return $null }
+function Save-Settings {
+    try {
+        $checked = @($Categories.Keys | Where-Object { $checkboxes[$_].Checked })
+        [pscustomobject]@{ Lang=$script:Lang; Auto=[bool]$chkAuto.Checked; Restore=[bool]$chkRestore.Checked; Checked=$checked } |
+            ConvertTo-Json | Set-Content -Path $SettingsFile -Encoding UTF8
+    } catch {}
+}
+
+# --- التحديث الذاتي ----------------------------------------------------------
+function Get-ExePath { try { return [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName } catch { return $null } }
 function Check-Update {
     try {
         $url = "https://raw.githubusercontent.com/$RepoOwner/$RepoName/main/version.txt"
         $latest = ((Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 8).Content).Trim()
-        if ([version]$latest -gt [version]$AppVersion) {
-            $m = "$(L 'updAvail'): $latest`n$(L 'updDownload')"
-            if ([System.Windows.Forms.MessageBox]::Show($m,(L 'updTitle'),'YesNo','Information') -eq 'Yes') {
-                Start-Process "https://github.com/$RepoOwner/$RepoName/releases/latest"
-            }
-        } else {
+        if ([version]$latest -le [version]$AppVersion) {
             [System.Windows.Forms.MessageBox]::Show((L 'updLatest'),(L 'updTitle'),'OK','Information') | Out-Null
+            return
         }
+        $exe = Get-ExePath
+        $isExe = ($exe -and ($exe -match 'DiskCleaner\.exe$'))
+        $m = "$(L 'updAvail'): $latest`n`n$(L 'updInstall')"
+        if ([System.Windows.Forms.MessageBox]::Show($m,(L 'updTitle'),'YesNo','Information') -ne 'Yes') { return }
+        if (-not $isExe) { Start-Process "https://github.com/$RepoOwner/$RepoName/releases/latest"; return }
+        # تنزيل النسخة الجديدة
+        $lblStatus.Text = L 'downloading'; [System.Windows.Forms.Application]::DoEvents()
+        $dl  = "https://github.com/$RepoOwner/$RepoName/releases/latest/download/DiskCleaner.exe"
+        $new = Join-Path $DataDir 'DiskCleaner_new.exe'
+        Invoke-WebRequest -Uri $dl -OutFile $new -UseBasicParsing -TimeoutSec 120
+        # سكربت استبدال يعمل بعد الإغلاق
+        $bat = Join-Path $DataDir 'update.cmd'
+        @"
+@echo off
+timeout /t 2 /nobreak >nul
+move /y "$new" "$exe" >nul
+start "" "$exe"
+del "%~f0"
+"@ | Set-Content -Path $bat -Encoding OEM
+        $lblStatus.Text = L 'updReady'; Write-Log "Updating $AppVersion -> $latest"
+        Start-Process cmd.exe -ArgumentList "/c `"$bat`"" -WindowStyle Hidden
+        $form.Close()
     } catch {
+        Write-Log "Update error: $($_.Exception.Message)"
         [System.Windows.Forms.MessageBox]::Show((L 'updFail'),(L 'updTitle'),'OK','Warning') | Out-Null
     }
 }
@@ -212,19 +262,23 @@ $clLink   = [System.Drawing.Color]::FromArgb(90,170,255)
 $fontMain = New-Object System.Drawing.Font("Segoe UI",10)
 $fontBold = New-Object System.Drawing.Font("Segoe UI",11,[System.Drawing.FontStyle]::Bold)
 
+# --- تحميل الإعدادات المحفوظة (اللغة) قبل بناء الواجهة ---
+$script:set = Load-Settings
+if ($script:set -and $script:set.Lang) { $script:Lang = $script:set.Lang }
+
 # ============================================================================
 #  النافذة
 # ============================================================================
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Disk & RAM Cleaner"
-$form.Size = New-Object System.Drawing.Size(580,760)
+$form.Size = New-Object System.Drawing.Size(580,790)
 $form.StartPosition = "CenterScreen"
 $form.BackColor = $clDark
 $form.ForeColor = $clText
 $form.Font = $fontMain
 $form.FormBorderStyle = 'FixedSingle'
 $form.MaximizeBox = $false
-try { $form.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon([System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName) } catch {}
+try { $form.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon((Get-ExePath)) } catch {}
 
 # --- شريط علوي متدرّج ---
 $header = New-Object System.Windows.Forms.Panel
@@ -233,13 +287,11 @@ $header.Size = New-Object System.Drawing.Size(580,66)
 $header.Add_Paint({
     param($s,$e)
     $rect = $s.ClientRectangle
-    if ($rect.Width -le 0 -or $rect.Height -le 0) { return }   # يمنع انهيار GDI+ عند إعادة الرسم
+    if ($rect.Width -le 0 -or $rect.Height -le 0) { return }
     try {
         $br = New-Object System.Drawing.Drawing2D.LinearGradientBrush($rect,$clAccent,$clPurple,0)
         $e.Graphics.FillRectangle($br,$rect); $br.Dispose()
-    } catch {
-        $e.Graphics.Clear($clAccent)
-    }
+    } catch { $e.Graphics.Clear($clAccent) }
 })
 $form.Controls.Add($header)
 
@@ -251,7 +303,6 @@ $lblTitle.Location = New-Object System.Drawing.Point(20,16)
 $lblTitle.Size = New-Object System.Drawing.Size(400,36)
 $header.Controls.Add($lblTitle)
 
-# زر تبديل اللغة
 $btnLang = New-Object System.Windows.Forms.Button
 $btnLang.Size = New-Object System.Drawing.Size(90,32)
 $btnLang.Location = New-Object System.Drawing.Point(460,17)
@@ -260,7 +311,6 @@ $btnLang.BackColor=[System.Drawing.Color]::Transparent; $btnLang.ForeColor=$clTe
 $btnLang.Font=$fontMain; $btnLang.Cursor='Hand'
 $header.Controls.Add($btnLang)
 
-# --- سطر المعلومات (قرص + رام) ---
 $lblInfo = New-Object System.Windows.Forms.Label
 $lblInfo.ForeColor = $clMuted
 $lblInfo.Location = New-Object System.Drawing.Point(20,78)
@@ -294,28 +344,24 @@ foreach ($key in $Categories.Keys) {
     $y += 32
 }
 
-# --- المجموع ---
 $lblTotal = New-Object System.Windows.Forms.Label
 $lblTotal.Font = $fontBold; $lblTotal.ForeColor = $clAccentH
 $lblTotal.Location = New-Object System.Drawing.Point(20,420)
 $lblTotal.Size = New-Object System.Drawing.Size(540,26)
 $form.Controls.Add($lblTotal)
 
-# --- شريط التقدّم ---
 $progress = New-Object System.Windows.Forms.ProgressBar
 $progress.Location = New-Object System.Drawing.Point(20,452)
 $progress.Size = New-Object System.Drawing.Size(540,18)
 $progress.Style = 'Continuous'
 $form.Controls.Add($progress)
 
-# --- الحالة ---
 $lblStatus = New-Object System.Windows.Forms.Label
 $lblStatus.ForeColor = $clMuted
 $lblStatus.Location = New-Object System.Drawing.Point(20,476)
 $lblStatus.Size = New-Object System.Drawing.Size(540,22)
 $form.Controls.Add($lblStatus)
 
-# --- الأزرار ---
 function New-Btn($x,$y,$w,$color,$hover) {
     $b = New-Object System.Windows.Forms.Button
     $b.Size=New-Object System.Drawing.Size($w,44)
@@ -335,32 +381,36 @@ $btnClose   = New-Btn 20  560 260 $clGray   $clGrayH
 $form.Controls.Add($btnClean); $form.Controls.Add($btnAnalyze)
 $form.Controls.Add($btnRam);   $form.Controls.Add($btnClose)
 
-# --- خيار تحرير الرام التلقائي ---
 $chkAuto = New-Object System.Windows.Forms.CheckBox
 $chkAuto.ForeColor = $clText; $chkAuto.Font = $fontMain
-$chkAuto.Location = New-Object System.Drawing.Point(20,616)
+$chkAuto.Location = New-Object System.Drawing.Point(20,614)
 $chkAuto.Size = New-Object System.Drawing.Size(540,26)
 $form.Controls.Add($chkAuto)
 
-# --- تذييل: تحديثات + توقيع ---
+$chkRestore = New-Object System.Windows.Forms.CheckBox
+$chkRestore.ForeColor = $clText; $chkRestore.Font = $fontMain
+$chkRestore.Location = New-Object System.Drawing.Point(20,644)
+$chkRestore.Size = New-Object System.Drawing.Size(540,26)
+$form.Controls.Add($chkRestore)
+
 $lnkUpdate = New-Object System.Windows.Forms.LinkLabel
 $lnkUpdate.LinkColor = $clLink; $lnkUpdate.ActiveLinkColor=$clAccentH
 $lnkUpdate.Font = $fontMain
-$lnkUpdate.Location = New-Object System.Drawing.Point(20,650)
+$lnkUpdate.Location = New-Object System.Drawing.Point(20,678)
 $lnkUpdate.Size = New-Object System.Drawing.Size(240,22)
 $form.Controls.Add($lnkUpdate)
 
 $lblCredit = New-Object System.Windows.Forms.Label
-$lblCredit.Text = "v$AppVersion  •  by Mohammed Majid"
+$lblCredit.Text = "v$AppVersion  -  by Mohammed Majid"
 $lblCredit.ForeColor = $clMuted
 $lblCredit.Font = New-Object System.Drawing.Font("Segoe UI",8)
 $lblCredit.TextAlign = 'MiddleRight'
-$lblCredit.Location = New-Object System.Drawing.Point(300,650)
+$lblCredit.Location = New-Object System.Drawing.Point(300,678)
 $lblCredit.Size = New-Object System.Drawing.Size(260,22)
 $form.Controls.Add($lblCredit)
 
 # ============================================================================
-#  اللغة + تحديث المعلومات
+#  اللغة + المعلومات
 # ============================================================================
 function Update-Header {
     $r = Get-RamInfo
@@ -382,22 +432,20 @@ function Apply-Language {
         $btnRam.Text     = L 'freeRam'
         $btnClose.Text   = L 'close'
         $chkAuto.Text    = L 'autoRam'
+        $chkRestore.Text = L 'restore'
         $lnkUpdate.Text  = L 'checkUpdate'
         foreach ($k in $Categories.Keys) { $checkboxes[$k].Text = $Categories[$k].Name[$script:Lang] }
         if ($script:analyzed) { $lblTotal.Text = "$(L 'totalClean'): $(Format-Size $script:lastTotal)" }
         else { $lblTotal.Text = L 'pressAnalyze' }
         Update-Header
-        $form.ResumeLayout()
-        $form.Refresh()
-    } catch {
-        try { $form.ResumeLayout() } catch {}
-    }
+        $form.ResumeLayout(); $form.Refresh()
+    } catch { try { $form.ResumeLayout() } catch {} }
 }
 
 # ============================================================================
 #  السلوك
 # ============================================================================
-$btnLang.Add_Click({ $script:Lang = if($script:Lang -eq 'ar'){'en'}else{'ar'}; Apply-Language })
+$btnLang.Add_Click({ $script:Lang = if($script:Lang -eq 'ar'){'en'}else{'ar'}; Apply-Language; Save-Settings })
 
 $btnAnalyze.Add_Click({
     $btnAnalyze.Enabled=$false; $btnClean.Enabled=$false
@@ -413,19 +461,23 @@ $btnAnalyze.Add_Click({
     }
     $script:analyzed=$true; $script:lastTotal=$total
     $lblTotal.Text = "$(L 'totalClean'): $(Format-Size $total)"
-    $lblStatus.Text = L 'doneAnalyze'
-    Update-Header
+    $lblStatus.Text = L 'doneAnalyze'; Update-Header
+    Write-Log "Analyzed. Total cleanable: $(Format-Size $total)"
     $btnAnalyze.Enabled=$true; $btnClean.Enabled=$true
 })
 
 $btnClean.Add_Click({
     $sel = @($Categories.Keys | Where-Object { $checkboxes[$_].Checked })
     if ($sel.Count -eq 0) { [System.Windows.Forms.MessageBox]::Show((L 'noSelect'),(L 'warn'),'OK','Warning')|Out-Null; return }
-    $names = ($sel | ForEach-Object { "• " + $Categories[$_].Name[$script:Lang] }) -join "`n"
+    $names = ($sel | ForEach-Object { "- " + $Categories[$_].Name[$script:Lang] }) -join "`n"
     $msg = "$(L 'willDelete')`n`n$names`n`n$(L 'permanent')"
     if ([System.Windows.Forms.MessageBox]::Show($msg,(L 'confirmTitle'),'YesNo','Question') -ne 'Yes') { return }
     $before = Get-FreeGB
     $btnAnalyze.Enabled=$false; $btnClean.Enabled=$false
+    if ($chkRestore.Checked) {
+        $lblStatus.Text = L 'restoring'; [System.Windows.Forms.Application]::DoEvents()
+        try { Enable-ComputerRestore -Drive "C:\" -EA SilentlyContinue; Checkpoint-Computer -Description "DiskCleaner $(Get-Date -Format 'yyyy-MM-dd HH:mm')" -RestorePointType "MODIFY_SETTINGS" -EA Stop; Write-Log "Restore point created" } catch { Write-Log "Restore point failed: $($_.Exception.Message)" }
+    }
     $progress.Value=0; $progress.Maximum=$sel.Count; $i=0
     foreach ($key in $sel) {
         $i++; $lblStatus.Text="$(L 'cleaning'): $($Categories[$key].Name[$script:Lang])..."
@@ -436,6 +488,7 @@ $btnClean.Add_Click({
     }
     $after = Get-FreeGB; $freed=[math]::Round($after-$before,2)
     Update-Header; $lblStatus.Text = L 'doneClean'
+    Write-Log "Cleaned [$($sel -join ', ')]. Freed $freed GB"
     $btnAnalyze.Enabled=$true; $btnClean.Enabled=$true
     $m = "$(L 'cleanOk')`n`n$(L 'before'): $before GB`n$(L 'after'): $after GB`n$(L 'freed'): $freed GB"
     [System.Windows.Forms.MessageBox]::Show($m,(L 'resultTitle'),'OK','Information')|Out-Null
@@ -449,6 +502,7 @@ $btnRam.Add_Click({
     $a = Get-RamInfo; Update-Header; $lblStatus.Text = L 'ramDone'
     $btnRam.Enabled=$true
     $freed=[math]::Round($a.FreeGB-$b.FreeGB,2)
+    Write-Log "RAM freed: $freed GB"
     $m = "$(L 'ramDone')`n`n$(L 'before'): $($b.FreeGB) GB ($($b.UsedPct)% $(L 'used'))`n$(L 'after'): $($a.FreeGB) GB ($($a.UsedPct)% $(L 'used'))`n$(L 'freed'): $freed GB"
     [System.Windows.Forms.MessageBox]::Show($m,(L 'ramTitle'),'OK','Information')|Out-Null
 })
@@ -457,16 +511,24 @@ $btnClose.Add_Click({ $form.Close() })
 
 $ramTimer = New-Object System.Windows.Forms.Timer
 $ramTimer.Interval = 600000
-$ramTimer.Add_Tick({ Clear-RAM; Update-Header; $lblStatus.Text = "$(L 'ramDone') @ $(Get-Date -Format 'HH:mm')" })
+$ramTimer.Add_Tick({ Clear-RAM; Update-Header; $lblStatus.Text = "$(L 'ramDone') @ $(Get-Date -Format 'HH:mm')"; Write-Log "Auto RAM free" })
 $chkAuto.Add_CheckedChanged({
-    if ($chkAuto.Checked) { $ramTimer.Start(); $lblStatus.Text = L 'autoOn' }
-    else { $ramTimer.Stop(); $lblStatus.Text = L 'autoOff' }
+    if ($chkAuto.Checked) { $ramTimer.Start(); $lblStatus.Text = L 'autoOn' } else { $ramTimer.Stop(); $lblStatus.Text = L 'autoOff' }
+    Save-Settings
 })
+$chkRestore.Add_CheckedChanged({ Save-Settings })
+foreach ($k in $Categories.Keys) { $checkboxes[$k].Add_CheckedChanged({ Save-Settings }) }
 
 $lnkUpdate.Add_LinkClicked({ Check-Update })
+$form.Add_FormClosing({ Save-Settings; Write-Log "Closed" })
 
-# ============================================================================
-$Apply = { Apply-Language }
-& $Apply
+# --- تطبيق الإعدادات المحفوظة على الواجهة ---
+if ($script:set) {
+    if ($script:set.Checked) { foreach ($k in $Categories.Keys) { $checkboxes[$k].Checked = ($script:set.Checked -contains $k) } }
+    if ($script:set.PSObject.Properties.Name -contains 'Restore') { $chkRestore.Checked = [bool]$script:set.Restore }
+    if ($script:set.PSObject.Properties.Name -contains 'Auto')    { $chkAuto.Checked    = [bool]$script:set.Auto }
+}
+
+Apply-Language
 $form.Add_Shown({ Apply-Language; $btnAnalyze.PerformClick() })
 [void]$form.ShowDialog()
