@@ -97,7 +97,7 @@ public partial class MainForm : Form
 
         _lnkUpdate = new LinkLabel { LinkColor = Theme.Link, ActiveLinkColor = Theme.AccentH, Font = Theme.Main,
             Location = new(12, 618), Size = new(240, 22) };
-        _lnkUpdate.LinkClicked += (_, _) => CheckUpdate();
+        _lnkUpdate.LinkClicked += async (_, _) => await CheckUpdate();
         Controls.Add(_lnkUpdate);
 
         _credit = new Label { Text = $"v{App.Version}  -  by {App.Author}", ForeColor = Theme.Muted,
@@ -352,20 +352,39 @@ public partial class MainForm : Form
         catch (Exception ex) { Logger.Log($"Restore point failed: {ex.Message}"); }
     }
 
-    private void CheckUpdate()
+    private async Task CheckUpdate()
     {
         try
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
-            string latest = http.GetStringAsync($"https://raw.githubusercontent.com/{App.RepoOwner}/{App.RepoName}/main/version.txt").Result.Trim();
-            if (Version.TryParse(latest, out var lv) && Version.TryParse(App.Version, out var cv) && lv > cv)
-            {
-                if (MessageBox.Show($"{Loc.T("updAvail")}: {latest}", Loc.T("updTitle"), MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
-                    Process.Start(new ProcessStartInfo($"https://github.com/{App.RepoOwner}/{App.RepoName}/releases/latest") { UseShellExecute = true });
-            }
-            else MessageBox.Show(Loc.T("updLatest"), Loc.T("updTitle"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+            string? latest = await Updater.GetLatestVersionAsync();
+            if (latest == null) { MessageBox.Show(Loc.T("updFail"), Loc.T("updTitle"), MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            if (!(Version.TryParse(latest, out var lv) && Version.TryParse(App.Version, out var cv) && lv > cv))
+            { MessageBox.Show(Loc.T("updLatest"), Loc.T("updTitle"), MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+
+            if (MessageBox.Show($"{Loc.T("updAvail")}: {latest}\n\n{Loc.T("updInstall")}", Loc.T("updTitle"), MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes)
+                return;
+
+            // إن لم يكن الملف التنفيذي المنشور (تشغيل تطوير)، افتح الصفحة فقط
+            if (!App.ExePath.EndsWith("DiskCleaner.exe", StringComparison.OrdinalIgnoreCase))
+            { Process.Start(new ProcessStartInfo($"https://github.com/{App.RepoOwner}/{App.RepoName}/releases/latest") { UseShellExecute = true }); return; }
+
+            _tabs.SelectedTab = _tpClean;
+            _lnkUpdate.Enabled = false;
+            _progress.Value = 0; _status.Text = Loc.T("downloading");
+            string newExe = Path.Combine(App.DataDir, "DiskCleaner_new.exe");
+            var progress = new Progress<int>(p => { _progress.Value = Math.Min(100, p); _status.Text = $"{Loc.T("downloading")} {p}%"; });
+            await Updater.DownloadAsync(newExe, progress);
+
+            _status.Text = Loc.T("updReady"); Logger.Log($"Update {App.Version} -> {latest}");
+            Updater.ApplyAndRestart(newExe);
+            Close();   // يخرج البرنامج، وسكربت التحديث يبدّل الملف ويعيد التشغيل
         }
-        catch (Exception ex) { Logger.Log($"Update check failed: {ex.Message}"); MessageBox.Show(Loc.T("updFail"), Loc.T("updTitle"), MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        catch (Exception ex)
+        {
+            _lnkUpdate.Enabled = true;
+            Logger.Log($"Update failed: {ex.Message}");
+            MessageBox.Show(Loc.T("updFail"), Loc.T("updTitle"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
     }
 
     private void ApplySettings()
