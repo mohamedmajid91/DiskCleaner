@@ -2,12 +2,6 @@
 ===============================================================================
   Disk & RAM Cleaner  -  منظّف القرص والذاكرة
   -----------------------------------------------------------------------------
-  * Bilingual (Arabic / English) with live language toggle
-  * Safe: never touches personal files (Downloads / Documents / Desktop)
-  * Disk cache cleanup + RAM release (working sets + standby list)
-  * Settings persistence, logging, restore points
-  * Self-updating from GitHub Releases
-  -----------------------------------------------------------------------------
   Author : Mohammed Majid
   Repo   : https://github.com/mohamedmajid91/DiskCleaner
 ===============================================================================
@@ -16,7 +10,7 @@
 # ==== إعدادات التحديث =======================================================
 $RepoOwner  = "mohamedmajid91"
 $RepoName   = "DiskCleaner"
-$AppVersion = "1.4.0"
+$AppVersion = "1.4.1"
 # ============================================================================
 
 # --- رفع الصلاحيات تلقائياً --------------------------------------------------
@@ -83,6 +77,7 @@ $T = @{
     diskFree     = @{ ar='قرص C: فارغ';          en='C: free' }
     ramUsed      = @{ ar='الرام مستخدمة';         en='RAM used' }
     freeWord     = @{ ar='فارغ';                  en='free' }
+    breakdown    = @{ ar='توزيع المساحة القابلة للتنظيف'; en='Cleanable space breakdown' }
     analyze      = @{ ar='تحليل';                 en='Analyze' }
     cleanSel     = @{ ar='تنظيف المحدد';          en='Clean Selected' }
     freeRam      = @{ ar='تحرير الذاكرة (RAM)';   en='Free RAM' }
@@ -121,6 +116,10 @@ $T = @{
     downloading  = @{ ar='جاري تنزيل التحديث...'; en='Downloading update...' }
     updReady     = @{ ar='تم التنزيل، جاري التثبيت وإعادة التشغيل...'; en='Downloaded. Installing and restarting...' }
     langBtn      = @{ ar='English';               en='عربي' }
+    trayShow     = @{ ar='إظهار البرنامج';        en='Show app' }
+    trayRam      = @{ ar='تحرير الذاكرة الآن';    en='Free RAM now' }
+    trayExit     = @{ ar='خروج';                  en='Exit' }
+    trayMin      = @{ ar='يعمل بالخلفية';         en='Running in the background' }
 }
 function L($k) { $T[$k][$script:Lang] }
 
@@ -197,7 +196,7 @@ function Invoke-Clean($key,$cat) {
     if ($cat.Service) { Start-Service $cat.Service -EA SilentlyContinue }
 }
 
-# --- الإعدادات (حفظ/تحميل) --------------------------------------------------
+# --- الإعدادات ---------------------------------------------------------------
 function Load-Settings { try { if(Test-Path $SettingsFile){ return Get-Content $SettingsFile -Raw -Encoding UTF8 | ConvertFrom-Json } } catch {} ; return $null }
 function Save-Settings {
     try {
@@ -222,12 +221,10 @@ function Check-Update {
         $m = "$(L 'updAvail'): $latest`n`n$(L 'updInstall')"
         if ([System.Windows.Forms.MessageBox]::Show($m,(L 'updTitle'),'YesNo','Information') -ne 'Yes') { return }
         if (-not $isExe) { Start-Process "https://github.com/$RepoOwner/$RepoName/releases/latest"; return }
-        # تنزيل النسخة الجديدة
         $lblStatus.Text = L 'downloading'; [System.Windows.Forms.Application]::DoEvents()
         $dl  = "https://github.com/$RepoOwner/$RepoName/releases/latest/download/DiskCleaner.exe"
         $new = Join-Path $DataDir 'DiskCleaner_new.exe'
         Invoke-WebRequest -Uri $dl -OutFile $new -UseBasicParsing -TimeoutSec 120
-        # سكربت استبدال يعمل بعد الإغلاق
         $bat = Join-Path $DataDir 'update.cmd'
         @"
 @echo off
@@ -238,7 +235,7 @@ del "%~f0"
 "@ | Set-Content -Path $bat -Encoding OEM
         $lblStatus.Text = L 'updReady'; Write-Log "Updating $AppVersion -> $latest"
         Start-Process cmd.exe -ArgumentList "/c `"$bat`"" -WindowStyle Hidden
-        $form.Close()
+        $script:reallyExit = $true; $form.Close()
     } catch {
         Write-Log "Update error: $($_.Exception.Message)"
         [System.Windows.Forms.MessageBox]::Show((L 'updFail'),(L 'updTitle'),'OK','Warning') | Out-Null
@@ -246,7 +243,7 @@ del "%~f0"
 }
 
 # ============================================================================
-#  الألوان والخطوط
+#  الألوان والخطوط + لوحة ألوان الرسوم
 # ============================================================================
 $clDark   = [System.Drawing.Color]::FromArgb(28,30,38)
 $clPanel  = [System.Drawing.Color]::FromArgb(40,43,52)
@@ -261,17 +258,30 @@ $clMuted  = [System.Drawing.Color]::FromArgb(165,172,185)
 $clLink   = [System.Drawing.Color]::FromArgb(90,170,255)
 $fontMain = New-Object System.Drawing.Font("Segoe UI",10)
 $fontBold = New-Object System.Drawing.Font("Segoe UI",11,[System.Drawing.FontStyle]::Bold)
+$Palette = @(
+    [System.Drawing.Color]::FromArgb(0,180,164), [System.Drawing.Color]::FromArgb(140,100,220),
+    [System.Drawing.Color]::FromArgb(235,170,50), [System.Drawing.Color]::FromArgb(225,90,90),
+    [System.Drawing.Color]::FromArgb(80,165,225), [System.Drawing.Color]::FromArgb(120,205,120),
+    [System.Drawing.Color]::FromArgb(210,120,185),[System.Drawing.Color]::FromArgb(170,165,90),
+    [System.Drawing.Color]::FromArgb(90,200,195), [System.Drawing.Color]::FromArgb(215,110,70),
+    [System.Drawing.Color]::FromArgb(150,130,225),[System.Drawing.Color]::FromArgb(110,190,160),
+    [System.Drawing.Color]::FromArgb(225,195,90)
+)
 
-# --- تحميل الإعدادات المحفوظة (اللغة) قبل بناء الواجهة ---
 $script:set = Load-Settings
 if ($script:set -and $script:set.Lang) { $script:Lang = $script:set.Lang }
+$script:sizes = @{}
+$script:ramPct = 0
+$script:analyzed = $false
+$script:lastTotal = [int64]0
+$script:reallyExit = $false
 
 # ============================================================================
 #  النافذة
 # ============================================================================
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Disk & RAM Cleaner"
-$form.Size = New-Object System.Drawing.Size(580,790)
+$form.Size = New-Object System.Drawing.Size(580,760)
 $form.StartPosition = "CenterScreen"
 $form.BackColor = $clDark
 $form.ForeColor = $clText
@@ -288,17 +298,13 @@ $header.Add_Paint({
     param($s,$e)
     $rect = $s.ClientRectangle
     if ($rect.Width -le 0 -or $rect.Height -le 0) { return }
-    try {
-        $br = New-Object System.Drawing.Drawing2D.LinearGradientBrush($rect,$clAccent,$clPurple,0)
-        $e.Graphics.FillRectangle($br,$rect); $br.Dispose()
-    } catch { $e.Graphics.Clear($clAccent) }
+    try { $br = New-Object System.Drawing.Drawing2D.LinearGradientBrush($rect,$clAccent,$clPurple,0); $e.Graphics.FillRectangle($br,$rect); $br.Dispose() } catch { $e.Graphics.Clear($clAccent) }
 })
 $form.Controls.Add($header)
 
 $lblTitle = New-Object System.Windows.Forms.Label
 $lblTitle.Font = New-Object System.Drawing.Font("Segoe UI",15,[System.Drawing.FontStyle]::Bold)
-$lblTitle.ForeColor = $clText
-$lblTitle.BackColor = [System.Drawing.Color]::Transparent
+$lblTitle.ForeColor = $clText; $lblTitle.BackColor = [System.Drawing.Color]::Transparent
 $lblTitle.Location = New-Object System.Drawing.Point(20,16)
 $lblTitle.Size = New-Object System.Drawing.Size(400,36)
 $header.Controls.Add($lblTitle)
@@ -313,16 +319,34 @@ $header.Controls.Add($btnLang)
 
 $lblInfo = New-Object System.Windows.Forms.Label
 $lblInfo.ForeColor = $clMuted
-$lblInfo.Location = New-Object System.Drawing.Point(20,78)
-$lblInfo.Size = New-Object System.Drawing.Size(540,24)
+$lblInfo.Location = New-Object System.Drawing.Point(20,74)
+$lblInfo.Size = New-Object System.Drawing.Size(540,20)
 $form.Controls.Add($lblInfo)
+
+# --- رسم بياني: شريط استخدام الرام ---
+$ramBar = New-Object System.Windows.Forms.Panel
+$ramBar.Location = New-Object System.Drawing.Point(20,97)
+$ramBar.Size = New-Object System.Drawing.Size(540,20)
+$ramBar.Add_Paint({
+    param($s,$e)
+    $w=$s.ClientSize.Width; $h=$s.ClientSize.Height
+    if($w -le 0 -or $h -le 0){ return }
+    $g=$e.Graphics
+    $bg=New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(55,60,70)); $g.FillRectangle($bg,0,0,$w,$h); $bg.Dispose()
+    $pct=$script:ramPct; $fw=[int]($w*$pct/100)
+    $col= if($pct -lt 70){[System.Drawing.Color]::FromArgb(0,180,120)} elseif($pct -lt 88){[System.Drawing.Color]::FromArgb(230,160,40)} else {[System.Drawing.Color]::FromArgb(215,70,70)}
+    if($fw -gt 0){ $fb=New-Object System.Drawing.SolidBrush $col; $g.FillRectangle($fb,0,0,$fw,$h); $fb.Dispose() }
+    $f=New-Object System.Drawing.Font("Segoe UI",8,[System.Drawing.FontStyle]::Bold)
+    $tb=New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::White)
+    $g.DrawString("RAM  $pct%",$f,$tb,6,2); $tb.Dispose()
+})
+$form.Controls.Add($ramBar)
 
 # --- لوحة الفئات ---
 $panel = New-Object System.Windows.Forms.Panel
-$panel.Location = New-Object System.Drawing.Point(20,110)
-$panel.Size = New-Object System.Drawing.Size(540,300)
-$panel.BackColor = $clPanel
-$panel.AutoScroll = $true
+$panel.Location = New-Object System.Drawing.Point(20,126)
+$panel.Size = New-Object System.Drawing.Size(540,232)
+$panel.BackColor = $clPanel; $panel.AutoScroll = $true
 $form.Controls.Add($panel)
 
 $checkboxes = @{}
@@ -332,10 +356,8 @@ foreach ($key in $Categories.Keys) {
     $cb = New-Object System.Windows.Forms.CheckBox
     $cb.ForeColor = $clText; $cb.Font = $fontMain
     $cb.Location = New-Object System.Drawing.Point(16,$y)
-    $cb.Size = New-Object System.Drawing.Size(320,26)
-    $cb.Checked = $true
+    $cb.Size = New-Object System.Drawing.Size(320,26); $cb.Checked = $true
     $panel.Controls.Add($cb); $checkboxes[$key] = $cb
-
     $sl = New-Object System.Windows.Forms.Label
     $sl.Text = "--"; $sl.ForeColor = $clMuted; $sl.TextAlign='MiddleRight'
     $sl.Location = New-Object System.Drawing.Point(360,$y)
@@ -346,19 +368,45 @@ foreach ($key in $Categories.Keys) {
 
 $lblTotal = New-Object System.Windows.Forms.Label
 $lblTotal.Font = $fontBold; $lblTotal.ForeColor = $clAccentH
-$lblTotal.Location = New-Object System.Drawing.Point(20,420)
-$lblTotal.Size = New-Object System.Drawing.Size(540,26)
+$lblTotal.Location = New-Object System.Drawing.Point(20,366)
+$lblTotal.Size = New-Object System.Drawing.Size(540,24)
 $form.Controls.Add($lblTotal)
 
+# --- رسم بياني: شريط توزيع الفئات ---
+$chart = New-Object System.Windows.Forms.Panel
+$chart.Location = New-Object System.Drawing.Point(20,394)
+$chart.Size = New-Object System.Drawing.Size(540,26)
+$chart.Add_Paint({
+    param($s,$e)
+    $w=$s.ClientSize.Width; $h=$s.ClientSize.Height
+    if($w -le 0 -or $h -le 0){ return }
+    $g=$e.Graphics
+    $bg=New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(55,60,70)); $g.FillRectangle($bg,0,0,$w,$h); $bg.Dispose()
+    if(-not $script:analyzed -or $script:lastTotal -le 0){ return }
+    $x=0.0; $idx=0
+    foreach($k in $Categories.Keys){
+        $sz=[double]$script:sizes[$k]
+        if($sz -gt 0){
+            $seg=($w*$sz/$script:lastTotal)
+            $col=$Palette[$idx % $Palette.Count]
+            $b=New-Object System.Drawing.SolidBrush $col
+            $g.FillRectangle($b,[int]$x,0,[math]::Max(1,[int]$seg),$h); $b.Dispose()
+            $x+=$seg
+        }
+        $idx++
+    }
+})
+$form.Controls.Add($chart)
+
 $progress = New-Object System.Windows.Forms.ProgressBar
-$progress.Location = New-Object System.Drawing.Point(20,452)
-$progress.Size = New-Object System.Drawing.Size(540,18)
+$progress.Location = New-Object System.Drawing.Point(20,428)
+$progress.Size = New-Object System.Drawing.Size(540,16)
 $progress.Style = 'Continuous'
 $form.Controls.Add($progress)
 
 $lblStatus = New-Object System.Windows.Forms.Label
 $lblStatus.ForeColor = $clMuted
-$lblStatus.Location = New-Object System.Drawing.Point(20,476)
+$lblStatus.Location = New-Object System.Drawing.Point(20,450)
 $lblStatus.Size = New-Object System.Drawing.Size(540,22)
 $form.Controls.Add($lblStatus)
 
@@ -368,56 +416,68 @@ function New-Btn($x,$y,$w,$color,$hover) {
     $b.Location=New-Object System.Drawing.Point($x,$y)
     $b.FlatStyle='Flat'; $b.FlatAppearance.BorderSize=0
     $b.BackColor=$color; $b.ForeColor=[System.Drawing.Color]::White
-    $b.Font=$fontBold; $b.Cursor='Hand'
-    $b.Tag=@{base=$color;hover=$hover}
+    $b.Font=$fontBold; $b.Cursor='Hand'; $b.Tag=@{base=$color;hover=$hover}
     $b.Add_MouseEnter({ $this.BackColor=$this.Tag.hover })
     $b.Add_MouseLeave({ $this.BackColor=$this.Tag.base })
     return $b
 }
-$btnClean   = New-Btn 300 508 260 $clAccent $clAccentH
-$btnAnalyze = New-Btn 20  508 260 $clGray   $clGrayH
-$btnRam     = New-Btn 300 560 260 $clPurple $clPurpleH
-$btnClose   = New-Btn 20  560 260 $clGray   $clGrayH
-$form.Controls.Add($btnClean); $form.Controls.Add($btnAnalyze)
-$form.Controls.Add($btnRam);   $form.Controls.Add($btnClose)
+$btnClean   = New-Btn 300 482 260 $clAccent $clAccentH
+$btnAnalyze = New-Btn 20  482 260 $clGray   $clGrayH
+$btnRam     = New-Btn 300 534 260 $clPurple $clPurpleH
+$btnClose   = New-Btn 20  534 260 $clGray   $clGrayH
+$form.Controls.Add($btnClean); $form.Controls.Add($btnAnalyze); $form.Controls.Add($btnRam); $form.Controls.Add($btnClose)
 
 $chkAuto = New-Object System.Windows.Forms.CheckBox
 $chkAuto.ForeColor = $clText; $chkAuto.Font = $fontMain
-$chkAuto.Location = New-Object System.Drawing.Point(20,614)
-$chkAuto.Size = New-Object System.Drawing.Size(540,26)
+$chkAuto.Location = New-Object System.Drawing.Point(20,588)
+$chkAuto.Size = New-Object System.Drawing.Size(540,24)
 $form.Controls.Add($chkAuto)
 
 $chkRestore = New-Object System.Windows.Forms.CheckBox
 $chkRestore.ForeColor = $clText; $chkRestore.Font = $fontMain
-$chkRestore.Location = New-Object System.Drawing.Point(20,644)
-$chkRestore.Size = New-Object System.Drawing.Size(540,26)
+$chkRestore.Location = New-Object System.Drawing.Point(20,616)
+$chkRestore.Size = New-Object System.Drawing.Size(540,24)
 $form.Controls.Add($chkRestore)
 
 $lnkUpdate = New-Object System.Windows.Forms.LinkLabel
-$lnkUpdate.LinkColor = $clLink; $lnkUpdate.ActiveLinkColor=$clAccentH
-$lnkUpdate.Font = $fontMain
-$lnkUpdate.Location = New-Object System.Drawing.Point(20,678)
+$lnkUpdate.LinkColor = $clLink; $lnkUpdate.ActiveLinkColor=$clAccentH; $lnkUpdate.Font = $fontMain
+$lnkUpdate.Location = New-Object System.Drawing.Point(20,648)
 $lnkUpdate.Size = New-Object System.Drawing.Size(240,22)
 $form.Controls.Add($lnkUpdate)
 
 $lblCredit = New-Object System.Windows.Forms.Label
 $lblCredit.Text = "v$AppVersion  -  by Mohammed Majid"
-$lblCredit.ForeColor = $clMuted
-$lblCredit.Font = New-Object System.Drawing.Font("Segoe UI",8)
+$lblCredit.ForeColor = $clMuted; $lblCredit.Font = New-Object System.Drawing.Font("Segoe UI",8)
 $lblCredit.TextAlign = 'MiddleRight'
-$lblCredit.Location = New-Object System.Drawing.Point(300,678)
+$lblCredit.Location = New-Object System.Drawing.Point(300,648)
 $lblCredit.Size = New-Object System.Drawing.Size(260,22)
 $form.Controls.Add($lblCredit)
+
+# --- أيقونة شريط المهام (System Tray) ---
+$tray = New-Object System.Windows.Forms.NotifyIcon
+$tray.Icon = if($form.Icon){$form.Icon}else{[System.Drawing.SystemIcons]::Application}
+$tray.Text = "Disk & RAM Cleaner"; $tray.Visible = $true
+$ctx = New-Object System.Windows.Forms.ContextMenuStrip
+$miShow = $ctx.Items.Add("Show app")
+$miRam  = $ctx.Items.Add("Free RAM now")
+$ctx.Items.Add("-") | Out-Null
+$miExit = $ctx.Items.Add("Exit")
+$tray.ContextMenuStrip = $ctx
+
+$ShowApp = { $form.Show(); $form.WindowState='Normal'; $form.Activate() }
+$miShow.Add_Click($ShowApp)
+$tray.Add_DoubleClick($ShowApp)
+$miRam.Add_Click({ Clear-RAM; $script:ramPct=(Get-RamInfo).UsedPct; $ramBar.Invalidate(); $tray.ShowBalloonTip(1500,"Disk & RAM Cleaner",(L 'ramDone'),'Info'); Write-Log "Tray RAM free" })
+$miExit.Add_Click({ $script:reallyExit=$true; $form.Close() })
 
 # ============================================================================
 #  اللغة + المعلومات
 # ============================================================================
 function Update-Header {
-    $r = Get-RamInfo
+    $r = Get-RamInfo; $script:ramPct = [int]$r.UsedPct
     $lblInfo.Text = "$(L 'diskFree') $(Get-FreeGB) GB    |    $(L 'ramUsed') $($r.UsedPct)%  ($(L 'freeWord') $($r.FreeGB) GB)"
+    $ramBar.Invalidate()
 }
-$script:analyzed = $false
-$script:lastTotal = [int64]0
 function Apply-Language {
     try {
         $ar = ($script:Lang -eq 'ar')
@@ -425,18 +485,14 @@ function Apply-Language {
         $form.RightToLeft = if($ar){'Yes'}else{'No'}
         $form.RightToLeftLayout = $ar
         $header.RightToLeft = if($ar){'Yes'}else{'No'}
-        $lblTitle.Text = L 'title'
-        $btnLang.Text  = L 'langBtn'
-        $btnAnalyze.Text = L 'analyze'
-        $btnClean.Text   = L 'cleanSel'
-        $btnRam.Text     = L 'freeRam'
-        $btnClose.Text   = L 'close'
-        $chkAuto.Text    = L 'autoRam'
-        $chkRestore.Text = L 'restore'
-        $lnkUpdate.Text  = L 'checkUpdate'
+        $lblTitle.Text = L 'title'; $btnLang.Text = L 'langBtn'
+        $btnAnalyze.Text = L 'analyze'; $btnClean.Text = L 'cleanSel'
+        $btnRam.Text = L 'freeRam'; $btnClose.Text = L 'close'
+        $chkAuto.Text = L 'autoRam'; $chkRestore.Text = L 'restore'
+        $lnkUpdate.Text = L 'checkUpdate'
+        $miShow.Text = L 'trayShow'; $miRam.Text = L 'trayRam'; $miExit.Text = L 'trayExit'
         foreach ($k in $Categories.Keys) { $checkboxes[$k].Text = $Categories[$k].Name[$script:Lang] }
-        if ($script:analyzed) { $lblTotal.Text = "$(L 'totalClean'): $(Format-Size $script:lastTotal)" }
-        else { $lblTotal.Text = L 'pressAnalyze' }
+        if ($script:analyzed) { $lblTotal.Text = "$(L 'totalClean'): $(Format-Size $script:lastTotal)" } else { $lblTotal.Text = L 'pressAnalyze' }
         Update-Header
         $form.ResumeLayout(); $form.Refresh()
     } catch { try { $form.ResumeLayout() } catch {} }
@@ -449,20 +505,21 @@ $btnLang.Add_Click({ $script:Lang = if($script:Lang -eq 'ar'){'en'}else{'ar'}; A
 
 $btnAnalyze.Add_Click({
     $btnAnalyze.Enabled=$false; $btnClean.Enabled=$false
-    $progress.Value=0; $progress.Maximum=$Categories.Count
-    $total=[int64]0; $i=0
+    $progress.Value=0; $progress.Maximum=$Categories.Count; $total=[int64]0; $i=0
     foreach ($key in $Categories.Keys) {
         $i++; $lblStatus.Text="$(L 'analyzing'): $($Categories[$key].Name[$script:Lang])..."
         [System.Windows.Forms.Application]::DoEvents()
         $s = Get-CategorySize $key $Categories[$key]
-        $sizeLabels[$key].Text = Format-Size $s
+        $script:sizes[$key]=$s; $sizeLabels[$key].Text = Format-Size $s
         $total += $s; $progress.Value=$i
         [System.Windows.Forms.Application]::DoEvents()
     }
     $script:analyzed=$true; $script:lastTotal=$total
+    # تلوين تسميات الأحجام لتطابق الرسم البياني
+    $idx=0; foreach($k in $Categories.Keys){ $sizeLabels[$k].ForeColor = if($script:sizes[$k] -gt 0){$Palette[$idx % $Palette.Count]}else{$clMuted}; $idx++ }
     $lblTotal.Text = "$(L 'totalClean'): $(Format-Size $total)"
-    $lblStatus.Text = L 'doneAnalyze'; Update-Header
-    Write-Log "Analyzed. Total cleanable: $(Format-Size $total)"
+    $lblStatus.Text = L 'doneAnalyze'; Update-Header; $chart.Invalidate()
+    Write-Log "Analyzed. Total: $(Format-Size $total)"
     $btnAnalyze.Enabled=$true; $btnClean.Enabled=$true
 })
 
@@ -483,11 +540,11 @@ $btnClean.Add_Click({
         $i++; $lblStatus.Text="$(L 'cleaning'): $($Categories[$key].Name[$script:Lang])..."
         [System.Windows.Forms.Application]::DoEvents()
         Invoke-Clean $key $Categories[$key]
-        $sizeLabels[$key].Text="0 B"; $progress.Value=$i
+        $sizeLabels[$key].Text="0 B"; $script:sizes[$key]=0; $progress.Value=$i
         [System.Windows.Forms.Application]::DoEvents()
     }
     $after = Get-FreeGB; $freed=[math]::Round($after-$before,2)
-    Update-Header; $lblStatus.Text = L 'doneClean'
+    Update-Header; $chart.Invalidate(); $lblStatus.Text = L 'doneClean'
     Write-Log "Cleaned [$($sel -join ', ')]. Freed $freed GB"
     $btnAnalyze.Enabled=$true; $btnClean.Enabled=$true
     $m = "$(L 'cleanOk')`n`n$(L 'before'): $before GB`n$(L 'after'): $after GB`n$(L 'freed'): $freed GB"
@@ -499,30 +556,27 @@ $btnRam.Add_Click({
     $b = Get-RamInfo; $lblStatus.Text = L 'freeingRam'
     [System.Windows.Forms.Application]::DoEvents()
     Clear-RAM; Start-Sleep -Milliseconds 600
-    $a = Get-RamInfo; Update-Header; $lblStatus.Text = L 'ramDone'
-    $btnRam.Enabled=$true
-    $freed=[math]::Round($a.FreeGB-$b.FreeGB,2)
-    Write-Log "RAM freed: $freed GB"
+    $a = Get-RamInfo; Update-Header; $lblStatus.Text = L 'ramDone'; $btnRam.Enabled=$true
+    $freed=[math]::Round($a.FreeGB-$b.FreeGB,2); Write-Log "RAM freed: $freed GB"
     $m = "$(L 'ramDone')`n`n$(L 'before'): $($b.FreeGB) GB ($($b.UsedPct)% $(L 'used'))`n$(L 'after'): $($a.FreeGB) GB ($($a.UsedPct)% $(L 'used'))`n$(L 'freed'): $freed GB"
     [System.Windows.Forms.MessageBox]::Show($m,(L 'ramTitle'),'OK','Information')|Out-Null
 })
 
-$btnClose.Add_Click({ $form.Close() })
+$btnClose.Add_Click({ $script:reallyExit=$true; $form.Close() })
 
 $ramTimer = New-Object System.Windows.Forms.Timer
 $ramTimer.Interval = 600000
-$ramTimer.Add_Tick({ Clear-RAM; Update-Header; $lblStatus.Text = "$(L 'ramDone') @ $(Get-Date -Format 'HH:mm')"; Write-Log "Auto RAM free" })
-$chkAuto.Add_CheckedChanged({
-    if ($chkAuto.Checked) { $ramTimer.Start(); $lblStatus.Text = L 'autoOn' } else { $ramTimer.Stop(); $lblStatus.Text = L 'autoOff' }
-    Save-Settings
-})
+$ramTimer.Add_Tick({ Clear-RAM; Update-Header; $lblStatus.Text = "$(L 'ramDone') @ $(Get-Date -Format 'HH:mm')"; Write-Log "Auto RAM free"; if(-not $form.Visible){ $tray.ShowBalloonTip(1500,"Disk & RAM Cleaner",(L 'ramDone'),'Info') } })
+$chkAuto.Add_CheckedChanged({ if ($chkAuto.Checked) { $ramTimer.Start(); $lblStatus.Text = L 'autoOn' } else { $ramTimer.Stop(); $lblStatus.Text = L 'autoOff' }; Save-Settings })
 $chkRestore.Add_CheckedChanged({ Save-Settings })
 foreach ($k in $Categories.Keys) { $checkboxes[$k].Add_CheckedChanged({ Save-Settings }) }
-
 $lnkUpdate.Add_LinkClicked({ Check-Update })
-$form.Add_FormClosing({ Save-Settings; Write-Log "Closed" })
 
-# --- تطبيق الإعدادات المحفوظة على الواجهة ---
+# التصغير يذهب لشريط المهام
+$form.Add_Resize({ if ($form.WindowState -eq 'Minimized') { $form.Hide(); $tray.ShowBalloonTip(1500,"Disk & RAM Cleaner",(L 'trayMin'),'Info') } })
+$form.Add_FormClosing({ Save-Settings; Write-Log "Closed"; try { $tray.Visible=$false; $tray.Dispose() } catch {} })
+
+# --- تطبيق الإعدادات المحفوظة ---
 if ($script:set) {
     if ($script:set.Checked) { foreach ($k in $Categories.Keys) { $checkboxes[$k].Checked = ($script:set.Checked -contains $k) } }
     if ($script:set.PSObject.Properties.Name -contains 'Restore') { $chkRestore.Checked = [bool]$script:set.Restore }

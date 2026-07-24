@@ -8,3 +8,9 @@ DC_test.exe
 
 # ملف احتياطي قديم
 تنظيف القرص.bat
+
+# مخرجات بناء C# / .NET
+bin/
+obj/
+publish/
+*.user
