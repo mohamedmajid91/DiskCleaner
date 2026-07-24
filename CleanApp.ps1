@@ -16,7 +16,7 @@
 # ==== إعدادات التحديث - عدّل هذين السطرين بعد إنشاء مستودع GitHub ============
 $RepoOwner  = "mohamedmajid91"           # اسم مستخدم GitHub
 $RepoName   = "DiskCleaner"
-$AppVersion = "1.3.0"
+$AppVersion = "1.3.1"
 # ============================================================================
 
 # --- رفع الصلاحيات تلقائياً --------------------------------------------------
@@ -69,7 +69,7 @@ public class MemTools {
 # ============================================================================
 #  الترجمة (عربي / إنجليزي)
 # ============================================================================
-$script:Lang = 'ar'
+$script:Lang = 'en'
 $T = @{
     title        = @{ ar='منظّف القرص والذاكرة'; en='Disk & RAM Cleaner' }
     diskFree     = @{ ar='قرص C: فارغ';          en='C: free' }
@@ -233,8 +233,13 @@ $header.Size = New-Object System.Drawing.Size(580,66)
 $header.Add_Paint({
     param($s,$e)
     $rect = $s.ClientRectangle
-    $br = New-Object System.Drawing.Drawing2D.LinearGradientBrush($rect,$clAccent,$clPurple,0)
-    $e.Graphics.FillRectangle($br,$rect); $br.Dispose()
+    if ($rect.Width -le 0 -or $rect.Height -le 0) { return }   # يمنع انهيار GDI+ عند إعادة الرسم
+    try {
+        $br = New-Object System.Drawing.Drawing2D.LinearGradientBrush($rect,$clAccent,$clPurple,0)
+        $e.Graphics.FillRectangle($br,$rect); $br.Dispose()
+    } catch {
+        $e.Graphics.Clear($clAccent)
+    }
 })
 $form.Controls.Add($header)
 
@@ -364,22 +369,29 @@ function Update-Header {
 $script:analyzed = $false
 $script:lastTotal = [int64]0
 function Apply-Language {
-    $ar = ($script:Lang -eq 'ar')
-    $form.RightToLeft = if($ar){'Yes'}else{'No'}
-    $form.RightToLeftLayout = $ar
-    $header.RightToLeft = if($ar){'Yes'}else{'No'}
-    $lblTitle.Text = L 'title'
-    $btnLang.Text  = L 'langBtn'
-    $btnAnalyze.Text = L 'analyze'
-    $btnClean.Text   = L 'cleanSel'
-    $btnRam.Text     = L 'freeRam'
-    $btnClose.Text   = L 'close'
-    $chkAuto.Text    = L 'autoRam'
-    $lnkUpdate.Text  = L 'checkUpdate'
-    foreach ($k in $Categories.Keys) { $checkboxes[$k].Text = $Categories[$k].Name[$script:Lang] }
-    if ($script:analyzed) { $lblTotal.Text = "$(L 'totalClean'): $(Format-Size $script:lastTotal)" }
-    else { $lblTotal.Text = L 'pressAnalyze' }
-    Update-Header
+    try {
+        $ar = ($script:Lang -eq 'ar')
+        $form.SuspendLayout()
+        $form.RightToLeft = if($ar){'Yes'}else{'No'}
+        $form.RightToLeftLayout = $ar
+        $header.RightToLeft = if($ar){'Yes'}else{'No'}
+        $lblTitle.Text = L 'title'
+        $btnLang.Text  = L 'langBtn'
+        $btnAnalyze.Text = L 'analyze'
+        $btnClean.Text   = L 'cleanSel'
+        $btnRam.Text     = L 'freeRam'
+        $btnClose.Text   = L 'close'
+        $chkAuto.Text    = L 'autoRam'
+        $lnkUpdate.Text  = L 'checkUpdate'
+        foreach ($k in $Categories.Keys) { $checkboxes[$k].Text = $Categories[$k].Name[$script:Lang] }
+        if ($script:analyzed) { $lblTotal.Text = "$(L 'totalClean'): $(Format-Size $script:lastTotal)" }
+        else { $lblTotal.Text = L 'pressAnalyze' }
+        Update-Header
+        $form.ResumeLayout()
+        $form.Refresh()
+    } catch {
+        try { $form.ResumeLayout() } catch {}
+    }
 }
 
 # ============================================================================
