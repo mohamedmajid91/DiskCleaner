@@ -1,0 +1,10 @@
+# الملف التنفيذي يُرفع عبر GitHub Releases وليس داخل المستودع
+DiskCleaner.exe
+*.exe
+
+# ملفات مؤقتة
+*.tmp
+DC_test.exe
+
+# ملف احتياطي قديم
+تنظيف القرص.bat
