@@ -9,12 +9,12 @@
   * Built-in GitHub update check
   -----------------------------------------------------------------------------
   Author : Mohammed Majid
-  Repo   : https://github.com/YOUR_GITHUB_USERNAME/DiskCleaner
+  Repo   : https://github.com/mohamedmajid91/DiskCleaner
 ===============================================================================
 #>
 
 # ==== إعدادات التحديث - عدّل هذين السطرين بعد إنشاء مستودع GitHub ============
-$RepoOwner  = "YOUR_GITHUB_USERNAME"     # <<< بدّلها باسم مستخدمك على GitHub
+$RepoOwner  = "mohamedmajid91"           # اسم مستخدم GitHub
 $RepoName   = "DiskCleaner"
 $AppVersion = "1.3.0"
 # ============================================================================
