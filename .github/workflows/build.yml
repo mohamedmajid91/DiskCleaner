@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build and release (e.g. v1.4.0)'
+        required: true
+        default: 'v1.4.0'
 
 permissions:
   contents: write
@@ -15,6 +21,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Resolve tag/version
+        id: ver
+        shell: powershell
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") { $tag = "${{ github.event.inputs.tag }}" }
+          else { $tag = "${{ github.ref_name }}" }
+          $ver = $tag.TrimStart('v')
+          "tag=$tag"     | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "version=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
       - name: Install ps2exe
         shell: powershell
         run: |
@@ -24,7 +40,6 @@ jobs:
       - name: Build EXE
         shell: powershell
         run: |
-          $ver = "${{ github.ref_name }}".TrimStart('v')
           Import-Module ps2exe
           $a = @{
             inputFile   = 'CleanApp.ps1'
@@ -36,7 +51,7 @@ jobs:
             company     = 'Mohammed Majid'
             product     = 'Disk Cleaner'
             copyright   = '(c) 2026 Mohammed Majid'
-            version     = $ver
+            version     = '${{ steps.ver.outputs.version }}'
           }
           if (Test-Path 'icon.ico') { $a['iconFile'] = 'icon.ico' }
           Invoke-ps2exe @a
@@ -50,6 +65,8 @@ jobs:
       - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: Disk & RAM Cleaner ${{ steps.ver.outputs.tag }}
           files: |
             DiskCleaner.exe
             DiskCleaner.exe.sha256
