@@ -5,7 +5,7 @@ namespace DiskCleaner;
 /// <summary>ثوابت التطبيق ومساراته.</summary>
 public static class App
 {
-    public const string Version   = "2.1.1";
+    public const string Version   = "2.1.2";
     public const string RepoOwner = "mohamedmajid91";
     public const string RepoName  = "DiskCleaner";
     public const string Author    = "Mohammed Majid";
@@ -17,7 +17,8 @@ public static class App
     public static string LogFile      => Path.Combine(DataDir, "log.txt");
     public static string HistoryFile  => Path.Combine(DataDir, "history.json");
 
-    public static string ExePath => Process.GetCurrentProcess().MainModule?.FileName ?? "";
+    // Environment.ProcessPath يرجّع مسار الـ EXE الحقيقي (يعمل بشكل صحيح مع single-file)
+    public static string ExePath => Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? "";
 
     static App()
     {

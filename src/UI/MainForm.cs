@@ -38,7 +38,7 @@ public partial class MainForm : Form
         BuildUi();
         ApplySettings();
         ApplyLanguage();
-        Shown += (_, _) => { ApplyLanguage(); RunAnalyze(); };
+        Shown += async (_, _) => { ApplyLanguage(); RunAnalyze(); await CheckUpdate(announce: false); };
     }
 
     // ===================== الهيكل العام =====================
@@ -366,20 +366,26 @@ public partial class MainForm : Form
         catch (Exception ex) { Logger.Log($"Restore point failed: {ex.Message}"); }
     }
 
-    private async Task CheckUpdate()
+    // announce=true: عند الضغط اليدوي (يظهر "أنت على أحدث إصدار" أو فشل).
+    // announce=false: فحص صامت عند بدء التشغيل (لا يزعج إلا عند وجود تحديث).
+    private async Task CheckUpdate(bool announce = true)
     {
         try
         {
             string? latest = await Updater.GetLatestVersionAsync();
-            if (latest == null) { MessageBox.Show(Loc.T("updFail"), Loc.T("updTitle"), MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            if (latest == null) { if (announce) MessageBox.Show(Loc.T("updFail"), Loc.T("updTitle"), MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
             if (!(Version.TryParse(latest, out var lv) && Version.TryParse(App.Version, out var cv) && lv > cv))
-            { MessageBox.Show(Loc.T("updLatest"), Loc.T("updTitle"), MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            { if (announce) MessageBox.Show(Loc.T("updLatest"), Loc.T("updTitle"), MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
 
             if (MessageBox.Show($"{Loc.T("updAvail")}: {latest}\n\n{Loc.T("updInstall")}", Loc.T("updTitle"), MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes)
                 return;
 
-            // إن لم يكن الملف التنفيذي المنشور (تشغيل تطوير)، افتح الصفحة فقط
-            if (!App.ExePath.EndsWith("DiskCleaner.exe", StringComparison.OrdinalIgnoreCase))
+            // التحديث الذاتي متاح لأي EXE (بأي اسم) ما عدا تشغيل التطوير عبر dotnet
+            string exe = App.ExePath;
+            bool canSelfUpdate = !string.IsNullOrEmpty(exe)
+                && exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+                && !Path.GetFileName(exe).Equals("dotnet.exe", StringComparison.OrdinalIgnoreCase);
+            if (!canSelfUpdate)
             { Process.Start(new ProcessStartInfo($"https://github.com/{App.RepoOwner}/{App.RepoName}/releases/latest") { UseShellExecute = true }); return; }
 
             _tabs.SelectedTab = _tpClean;
@@ -389,7 +395,7 @@ public partial class MainForm : Form
             var progress = new Progress<int>(p => { _progress.Value = Math.Min(100, p); _status.Text = $"{Loc.T("downloading")} {p}%"; });
             await Updater.DownloadAsync(newExe, progress);
 
-            _status.Text = Loc.T("updReady"); Logger.Log($"Update {App.Version} -> {latest}");
+            _status.Text = Loc.T("updReady"); Logger.Log($"Update {App.Version} -> {latest} (target: {exe})");
             Updater.ApplyAndRestart(newExe);
             Close();   // يخرج البرنامج، وسكربت التحديث يبدّل الملف ويعيد التشغيل
         }
@@ -397,7 +403,7 @@ public partial class MainForm : Form
         {
             _lnkUpdate.Enabled = true;
             Logger.Log($"Update failed: {ex.Message}");
-            MessageBox.Show(Loc.T("updFail"), Loc.T("updTitle"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            if (announce) MessageBox.Show(Loc.T("updFail"), Loc.T("updTitle"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 
