@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using DiskCleaner.Core;
 using DiskCleaner.Services;
 
@@ -25,9 +26,11 @@ public partial class MainForm
     private ColumnHeader _sName = null!, _sStatus = null!, _sScope = null!, _sCmd = null!;
 
     // ---- العمليات ----
-    private Button _btnRefProc = null!, _btnKill = null!;
+    private Button _btnRefProc = null!, _btnKill = null!, _btnPrioNormal = null!, _btnPrioBelow = null!, _btnPrioIdle = null!;
+    private Button _btnPwrHigh = null!, _btnPwrBal = null!;
+    private Label _lblPower = null!;
     private ListView _lvProc = null!;
-    private ColumnHeader _pName = null!, _pPid = null!, _pMem = null!;
+    private ColumnHeader _pName = null!, _pPid = null!, _pCpu = null!, _pMem = null!;
 
     // ---- الجدولة ----
     private Label _lblSchedStatus = null!, _lblSchedInfo = null!;
@@ -182,24 +185,62 @@ public partial class MainForm
     // ============================ العمليات ============================
     private void BuildProcessTab(TabPage tp)
     {
-        _btnRefProc = MakeBtn(12, 8, 110, Theme.Accent, Theme.AccentH); _btnRefProc.Size = new(110, 30);
-        _btnKill    = MakeBtn(130, 8, 130, Theme.Gray, Theme.GrayH);    _btnKill.Size = new(130, 30);
-        _lvProc = MakeList(12, 46, 576, 448); StyleList(_lvProc);
-        _pName = _lvProc.Columns.Add("Name", 260); _pPid = _lvProc.Columns.Add("PID", 90); _pMem = _lvProc.Columns.Add("Memory", 120);
-        _btnRefProc.Click += (_, _) => RefreshProc();
-        _btnKill.Click    += (_, _) => KillProc();
-        tp.Controls.AddRange(new Control[] { _btnRefProc, _btnKill, _lvProc });
+        // الصف الأول: تحديث + إنهاء + أزرار الأولوية
+        _btnRefProc    = MakeBtn(12, 8, 96, Theme.Accent, Theme.AccentH); _btnRefProc.Size = new(96, 28);
+        _btnKill       = MakeBtn(112, 8, 96, Theme.Gray, Theme.GrayH);    _btnKill.Size = new(96, 28);
+        _btnPrioNormal = MakeBtn(220, 8, 118, Theme.Gray, Theme.GrayH);   _btnPrioNormal.Size = new(118, 28);
+        _btnPrioBelow  = MakeBtn(342, 8, 118, Theme.Gray, Theme.GrayH);   _btnPrioBelow.Size = new(118, 28);
+        _btnPrioIdle   = MakeBtn(464, 8, 118, Theme.Gray, Theme.GrayH);   _btnPrioIdle.Size = new(118, 28);
+        // الصف الثاني: خطة الطاقة
+        _lblPower  = new Label { ForeColor = Theme.Muted, Location = new(12, 44), Size = new(90, 24), TextAlign = ContentAlignment.MiddleLeft };
+        _btnPwrHigh = MakeBtn(104, 42, 150, Theme.Purple, Theme.PurpleH); _btnPwrHigh.Size = new(150, 26);
+        _btnPwrBal  = MakeBtn(260, 42, 120, Theme.Gray, Theme.GrayH);     _btnPwrBal.Size = new(120, 26);
+
+        _lvProc = MakeList(12, 78, 576, 416); StyleList(_lvProc);
+        _pName = _lvProc.Columns.Add("Name", 250); _pPid = _lvProc.Columns.Add("PID", 70);
+        _pCpu = _lvProc.Columns.Add("CPU", 70); _pMem = _lvProc.Columns.Add("Memory", 110);
+
+        _btnRefProc.Click    += (_, _) => RefreshProc();
+        _btnKill.Click       += (_, _) => KillProc();
+        _btnPrioNormal.Click += (_, _) => SetProcPriority(ProcessPriorityClass.Normal);
+        _btnPrioBelow.Click  += (_, _) => SetProcPriority(ProcessPriorityClass.BelowNormal);
+        _btnPrioIdle.Click   += (_, _) => SetProcPriority(ProcessPriorityClass.Idle);
+        _btnPwrHigh.Click    += (_, _) => { PowerPlan.HighPerformance(); _lblStatusFlash(_lblPower); };
+        _btnPwrBal.Click     += (_, _) => { PowerPlan.Balanced(); _lblStatusFlash(_lblPower); };
+
+        tp.Controls.AddRange(new Control[] { _btnRefProc, _btnKill, _btnPrioNormal, _btnPrioBelow, _btnPrioIdle,
+            _lblPower, _btnPwrHigh, _btnPwrBal, _lvProc });
     }
+
+    private static void _lblStatusFlash(Label l) { l.ForeColor = Theme.AccentH; }
 
     private void RefreshProc()
     {
-        _lvProc.Items.Clear();
-        foreach (var p in ProcessMonitor.Top(25))
+        _btnRefProc.Enabled = false;
+        Task.Run(() => ProcessMonitor.Top(30)).ContinueWith(t =>
         {
-            var it = new ListViewItem(p.Name);
-            it.SubItems.Add(p.Pid.ToString()); it.SubItems.Add(Theme.FormatSize(p.Memory));
-            _lvProc.Items.Add(it);
-        }
+            var list = t.Result;
+            BeginInvoke((MethodInvoker)(() =>
+            {
+                _lvProc.Items.Clear();
+                foreach (var p in list)
+                {
+                    var it = new ListViewItem(p.Name);
+                    it.SubItems.Add(p.Pid.ToString());
+                    it.SubItems.Add($"{p.Cpu}%");
+                    it.SubItems.Add(Theme.FormatSize(p.Memory));
+                    if (p.Cpu >= 25) it.ForeColor = Color.FromArgb(235, 150, 60);
+                    _lvProc.Items.Add(it);
+                }
+                _btnRefProc.Enabled = true;
+            }));
+        });
+    }
+
+    private void SetProcPriority(ProcessPriorityClass cls)
+    {
+        if (_lvProc.SelectedItems.Count == 0) return;
+        if (int.TryParse(_lvProc.SelectedItems[0].SubItems[1].Text, out var pid)) ProcessMonitor.SetPriority(pid, cls);
     }
 
     private void KillProc()
@@ -268,7 +309,9 @@ public partial class MainForm
         _sName.Text = Loc.T("colName"); _sStatus.Text = Loc.T("colStatus"); _sScope.Text = Loc.T("colScope"); _sCmd.Text = Loc.T("colCommand");
 
         _btnRefProc.Text = Loc.T("refresh"); _btnKill.Text = Loc.T("kill");
-        _pName.Text = Loc.T("colName"); _pPid.Text = Loc.T("colPid"); _pMem.Text = Loc.T("colMem");
+        _btnPrioNormal.Text = Loc.T("prioNormal"); _btnPrioBelow.Text = Loc.T("prioBelow"); _btnPrioIdle.Text = Loc.T("prioIdle");
+        _lblPower.Text = Loc.T("powerPlan"); _btnPwrHigh.Text = Loc.T("powerHigh"); _btnPwrBal.Text = Loc.T("powerBalanced");
+        _pName.Text = Loc.T("colName"); _pPid.Text = Loc.T("colPid"); _pCpu.Text = Loc.T("colCpu"); _pMem.Text = Loc.T("colMem");
 
         _lblSchedInfo.Text = Loc.T("schedInfo"); _btnSchedOn.Text = Loc.T("enableWeekly"); _btnSchedOff.Text = Loc.T("disableWeekly");
         RefreshSched();

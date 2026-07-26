@@ -14,7 +14,9 @@ public partial class MainForm : Form
     private readonly Dictionary<string, Label> _sizeLabels = new();
     private readonly Dictionary<string, long> _sizes = new();
 
-    private Panel _header = null!, _ramBar = null!, _catPanel = null!, _chart = null!;
+    private Panel _header = null!, _ramBar = null!, _cpuBar = null!, _catPanel = null!, _chart = null!;
+    private System.Windows.Forms.Timer _cpuTimer = null!;
+    private int _cpuPct;
     private Label _title = null!, _info = null!, _total = null!, _status = null!, _credit = null!;
     private Button _btnLang = null!, _btnAnalyze = null!, _btnClean = null!, _btnRam = null!;
     private CheckBox _chkAuto = null!, _chkRestore = null!;
@@ -116,9 +118,14 @@ public partial class MainForm : Form
         _ramTimer.Tick += (_, _) => { NativeMemory.FreeAll(); UpdateHeader(); _status.Text = $"{Loc.T("ramDone")} @ {DateTime.Now:HH:mm}"; Logger.Log("Auto RAM free");
             if (!Visible) _tray.ShowBalloonTip(1500, "Disk & RAM Cleaner", Loc.T("ramDone"), ToolTipIcon.Info); };
 
+        // مؤشر المعالج الحيّ (عيّنة كل 1.5 ثانية)
+        _cpuTimer = new System.Windows.Forms.Timer { Interval = 1500 };
+        _cpuTimer.Tick += (_, _) => { _cpuPct = SystemInfo.GetCpuUsage(); _cpuBar.Invalidate(); };
+        _cpuTimer.Start();
+
         BuildTray();
         Resize += (_, _) => { if (WindowState == FormWindowState.Minimized) { Hide(); _tray.ShowBalloonTip(1500, "Disk & RAM Cleaner", Loc.T("trayMin"), ToolTipIcon.Info); } };
-        FormClosing += (_, _) => { SaveSettings(); Logger.Log("Closed"); try { _tray.Visible = false; _tray.Dispose(); } catch { } };
+        FormClosing += (_, _) => { SaveSettings(); Logger.Log("Closed"); try { _cpuTimer.Stop(); _tray.Visible = false; _tray.Dispose(); } catch { } };
     }
 
     // ===================== تبويب التنظيف =====================
@@ -134,7 +141,12 @@ public partial class MainForm : Form
         _ramBar.Resize += (_, _) => _ramBar.Invalidate();
         tp.Controls.Add(_ramBar);
 
-        _catPanel = new Panel { Location = new(12, 54), Size = new(576, 208), BackColor = Theme.Panel, AutoScroll = true, Anchor = wideLR };
+        _cpuBar = new Panel { Location = new(12, 50), Size = new(576, 18), Anchor = wideLR };
+        _cpuBar.Paint += CpuBar_Paint;
+        _cpuBar.Resize += (_, _) => _cpuBar.Invalidate();
+        tp.Controls.Add(_cpuBar);
+
+        _catPanel = new Panel { Location = new(12, 72), Size = new(576, 190), BackColor = Theme.Panel, AutoScroll = true, Anchor = wideLR };
         tp.Controls.Add(_catPanel);
         int y = 10;
         foreach (var c in _cats)
@@ -224,6 +236,20 @@ public partial class MainForm : Form
         using var f = new Font("Segoe UI", 8F, FontStyle.Bold);
         using var tb = new SolidBrush(Color.White);
         g.DrawString($"RAM  {_ramPct}%", f, tb, 6, 1);
+    }
+
+    private void CpuBar_Paint(object? sender, PaintEventArgs e)
+    {
+        int w = _cpuBar.ClientSize.Width, h = _cpuBar.ClientSize.Height;
+        if (w <= 0 || h <= 0) return;
+        var g = e.Graphics;
+        using (var bg = new SolidBrush(Theme.Gray)) g.FillRectangle(bg, 0, 0, w, h);
+        int fw = w * _cpuPct / 100;
+        var col = _cpuPct < 60 ? Color.FromArgb(0, 170, 200) : _cpuPct < 85 ? Color.FromArgb(230, 160, 40) : Color.FromArgb(215, 70, 70);
+        if (fw > 0) using (var fb = new SolidBrush(col)) g.FillRectangle(fb, 0, 0, fw, h);
+        using var f = new Font("Segoe UI", 8F, FontStyle.Bold);
+        using var tb = new SolidBrush(Color.White);
+        g.DrawString($"CPU  {_cpuPct}%", f, tb, 6, 1);
     }
 
     private void Chart_Paint(object? sender, PaintEventArgs e)

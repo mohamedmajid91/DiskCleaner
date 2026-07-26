@@ -149,6 +149,15 @@ public static class Loc
         ["removeMember"] = ("Remove selected member", "إزالة العضو المحدد"),
         ["done"]         = ("Done.", "تم."),
         ["yes2"]         = ("Yes", "نعم"),
+
+        // المعالج (CPU)
+        ["colCpu"]       = ("CPU", "المعالج"),
+        ["prioNormal"]   = ("Normal priority", "أولوية عادية"),
+        ["prioBelow"]    = ("Lower priority", "أولوية أقل"),
+        ["prioIdle"]     = ("Idle priority", "أولوية خاملة"),
+        ["powerPlan"]    = ("Power plan:", "خطة الطاقة:"),
+        ["powerHigh"]    = ("High performance", "أداء عالٍ"),
+        ["powerBalanced"]= ("Balanced", "متوازن"),
     };
 
     /// <summary>يرجّع النص حسب اللغة الحالية.</summary>
