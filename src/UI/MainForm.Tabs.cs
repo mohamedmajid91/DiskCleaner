@@ -56,7 +56,7 @@ public partial class MainForm
     }
 
     // ============================ الملفات الكبيرة ============================
-    private void BuildLargeTab(TabPage tp)
+    private void BuildLargeTab(Panel tp)
     {
         _cmbLarge = new ComboBox { Location = new(12, 12), Size = new(90, 26), DropDownStyle = ComboBoxStyle.DropDownList,
             BackColor = Theme.Panel, ForeColor = Theme.TextCol, FlatStyle = FlatStyle.Flat };
@@ -96,7 +96,7 @@ public partial class MainForm
     }
 
     // ============================ المكرّرات ============================
-    private void BuildDuplicatesTab(TabPage tp)
+    private void BuildDuplicatesTab(Panel tp)
     {
         _cmbDup = new ComboBox { Location = new(12, 12), Size = new(90, 26), DropDownStyle = ComboBoxStyle.DropDownList,
             BackColor = Theme.Panel, ForeColor = Theme.TextCol, FlatStyle = FlatStyle.Flat };
@@ -150,7 +150,7 @@ public partial class MainForm
     }
 
     // ============================ بدء التشغيل ============================
-    private void BuildStartupTab(TabPage tp)
+    private void BuildStartupTab(Panel tp)
     {
         _btnRefStartup = MakeBtn(12, 8, 110, Theme.Accent, Theme.AccentH); _btnRefStartup.Size = new(110, 30);
         _btnEnStartup  = MakeBtn(130, 8, 110, Theme.Gray, Theme.GrayH);    _btnEnStartup.Size = new(110, 30);
@@ -183,7 +183,7 @@ public partial class MainForm
     }
 
     // ============================ العمليات ============================
-    private void BuildProcessTab(TabPage tp)
+    private void BuildProcessTab(Panel tp)
     {
         // الصف الأول: تحديث + إنهاء + أزرار الأولوية
         _btnRefProc    = MakeBtn(12, 8, 96, Theme.Accent, Theme.AccentH); _btnRefProc.Size = new(96, 28);
@@ -253,7 +253,7 @@ public partial class MainForm
     }
 
     // ============================ الجدولة ============================
-    private void BuildScheduleTab(TabPage tp)
+    private void BuildScheduleTab(Panel tp)
     {
         _lblSchedStatus = new Label { Font = Theme.Bold, ForeColor = Theme.AccentH, Location = new(16, 24), Size = new(560, 26) };
         _lblSchedInfo = new Label { ForeColor = Theme.Muted, Location = new(16, 56), Size = new(560, 40) };
@@ -272,7 +272,7 @@ public partial class MainForm
     }
 
     // ============================ السجل ============================
-    private void BuildHistoryTab(TabPage tp)
+    private void BuildHistoryTab(Panel tp)
     {
         _lblTotalFreed = new Label { Font = Theme.Bold, ForeColor = Theme.AccentH, Location = new(12, 12), Size = new(400, 26) };
         _btnClearHist = MakeBtn(430, 8, 158, Theme.Gray, Theme.GrayH); _btnClearHist.Size = new(158, 30);

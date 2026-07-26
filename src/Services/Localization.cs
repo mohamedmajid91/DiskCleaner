@@ -57,6 +57,7 @@ public static class Loc
         ["trayMin"]      = ("Running in the background", "يعمل بالخلفية"),
 
         // التبويبات
+        ["tabDashboard"] = ("Dashboard", "الرئيسية"),
         ["tabClean"]     = ("Clean", "تنظيف"),
         ["tabLarge"]     = ("Large files", "الملفات الكبيرة"),
         ["tabDup"]       = ("Duplicates", "المكرّرات"),

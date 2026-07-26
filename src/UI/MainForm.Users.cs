@@ -13,7 +13,7 @@ public partial class MainForm
     private ListView _lvMembers = null!;
     private ColumnHeader _mName = null!;
 
-    private void BuildUsersTab(TabPage tp)
+    private void BuildUsersTab(Panel tp)
     {
         // الصف الأول
         _btnRefUsers   = MakeMini(12, 8, 90);  _btnNewUser = MakeMini(108, 8, 96);

@@ -11,7 +11,7 @@ public partial class MainForm
     private ColumnHeader _aName = null!, _aPub = null!, _aVer = null!, _aSize = null!;
     private ColumnHeader _lType = null!, _lSize = null!, _lPath = null!;
 
-    private void BuildUninstallTab(TabPage tp)
+    private void BuildUninstallTab(Panel tp)
     {
         _btnRefApps   = MakeBtn(12, 8, 120, Theme.Accent, Theme.AccentH);  _btnRefApps.Size = new(120, 30);
         _btnUninstall = MakeBtn(140, 8, 120, Theme.Gray, Theme.GrayH);     _btnUninstall.Size = new(120, 30);
