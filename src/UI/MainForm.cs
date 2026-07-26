@@ -416,9 +416,9 @@ public partial class MainForm : Form
 
             _tabs.SelectedTab = _tpClean;
             _lnkUpdate.Enabled = false;
-            _progress.Value = 0; _status.Text = Loc.T("downloading");
+            _progress.Maximum = 100; _progress.Value = 0; _status.Text = Loc.T("downloading");
             string newExe = Path.Combine(App.DataDir, "DiskCleaner_new.exe");
-            var progress = new Progress<int>(p => { _progress.Value = Math.Min(100, p); _status.Text = $"{Loc.T("downloading")} {p}%"; });
+            var progress = new Progress<int>(p => { _progress.Value = Math.Clamp(p, 0, 100); _status.Text = $"{Loc.T("downloading")} {p}%"; });
             await Updater.DownloadAsync(newExe, progress);
 
             _status.Text = Loc.T("updReady"); Logger.Log($"Update {App.Version} -> {latest} (target: {exe})");
