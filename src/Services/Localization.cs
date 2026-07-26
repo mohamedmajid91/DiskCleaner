@@ -149,6 +149,9 @@ public static class Loc
         ["removeMember"] = ("Remove selected member", "إزالة العضو المحدد"),
         ["done"]         = ("Done.", "تم."),
         ["yes2"]         = ("Yes", "نعم"),
+        ["renameUser"]   = ("Rename", "إعادة تسمية"),
+        ["promptNewName"]= ("New account name:", "اسم الحساب الجديد:"),
+        ["cantRenameSelf"]=("You can't rename the account you're currently signed in with.", "ما تگدر تعيد تسمية الحساب اللي داخل بيه حالياً."),
 
         // المعالج (CPU)
         ["colCpu"]       = ("CPU", "المعالج"),

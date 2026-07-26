@@ -1,3 +1,4 @@
+using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
 using DiskCleaner.Services;
 
@@ -72,6 +73,16 @@ public static class UserManager
         using var u = UserPrincipal.FindByIdentity(ctx, name) ?? throw new InvalidOperationException("User not found");
         u.Enabled = enabled; u.Save();
         Logger.Log($"User {name} enabled={enabled}");
+    }
+
+    /// <summary>إعادة تسمية اسم الدخول (يحتفظ بالـ SID — لا يغيّر مجلد البروفايل).</summary>
+    public static void RenameUser(string oldName, string newName)
+    {
+        using var computer = new DirectoryEntry($"WinNT://{Environment.MachineName},computer");
+        using var user = computer.Children.Find(oldName, "user");
+        user.Rename(newName);
+        user.CommitChanges();
+        Logger.Log($"User renamed: {oldName} -> {newName}");
     }
 
     public static void SetPasswordNeverExpires(string name, bool value)

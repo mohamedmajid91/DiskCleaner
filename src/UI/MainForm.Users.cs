@@ -5,7 +5,7 @@ namespace DiskCleaner.UI;
 
 public partial class MainForm
 {
-    private Button _btnRefUsers = null!, _btnNewUser = null!, _btnDelUser = null!, _btnResetPwd = null!, _btnEnUser = null!, _btnDisUser = null!;
+    private Button _btnRefUsers = null!, _btnNewUser = null!, _btnRenameUser = null!, _btnDelUser = null!, _btnResetPwd = null!, _btnEnUser = null!, _btnDisUser = null!;
     private ListView _lvUsers = null!;
     private ColumnHeader _uName = null!, _uFull = null!, _uStatus = null!, _uNever = null!, _uDesc = null!;
     private ComboBox _cmbGroups = null!;
@@ -15,10 +15,13 @@ public partial class MainForm
 
     private void BuildUsersTab(TabPage tp)
     {
-        _btnRefUsers = MakeMini(12, 8, 88); _btnNewUser = MakeMini(104, 8, 96); _btnDelUser = MakeMini(204, 8, 80);
-        _btnResetPwd = MakeMini(288, 8, 130); _btnEnUser = MakeMini(422, 8, 78); _btnDisUser = MakeMini(504, 8, 84);
+        // الصف الأول
+        _btnRefUsers   = MakeMini(12, 8, 90);  _btnNewUser = MakeMini(108, 8, 96);
+        _btnRenameUser = MakeMini(210, 8, 104); _btnDelUser = MakeMini(320, 8, 84);
+        // الصف الثاني
+        _btnResetPwd = MakeMini(12, 40, 130); _btnEnUser = MakeMini(148, 40, 90); _btnDisUser = MakeMini(244, 40, 90);
 
-        _lvUsers = MakeList(12, 44, 576, 220);
+        _lvUsers = MakeList(12, 74, 576, 186);
         _lvUsers.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         _uName = _lvUsers.Columns.Add("Name", 120); _uFull = _lvUsers.Columns.Add("Full name", 130);
         _uStatus = _lvUsers.Columns.Add("Status", 70); _uNever = _lvUsers.Columns.Add("Never expires", 90); _uDesc = _lvUsers.Columns.Add("Description", 160);
@@ -35,6 +38,7 @@ public partial class MainForm
 
         _btnRefUsers.Click += (_, _) => RefreshUsers();
         _btnNewUser.Click  += (_, _) => NewUser();
+        _btnRenameUser.Click += (_, _) => RenameUser();
         _btnDelUser.Click  += (_, _) => DeleteUser();
         _btnResetPwd.Click += (_, _) => ResetPwd();
         _btnEnUser.Click   += (_, _) => SetUserEnabled(true);
@@ -42,7 +46,7 @@ public partial class MainForm
         _btnAddMember.Click += (_, _) => ChangeMembership(true);
         _btnRemMember.Click += (_, _) => ChangeMembership(false);
 
-        tp.Controls.AddRange(new Control[] { _btnRefUsers, _btnNewUser, _btnDelUser, _btnResetPwd, _btnEnUser, _btnDisUser,
+        tp.Controls.AddRange(new Control[] { _btnRefUsers, _btnNewUser, _btnRenameUser, _btnDelUser, _btnResetPwd, _btnEnUser, _btnDisUser,
             _lvUsers, lblG, _cmbGroups, _btnAddMember, _btnRemMember, _lvMembers });
         _lblGroupCaption = lblG;
     }
@@ -98,6 +102,16 @@ public partial class MainForm
         catch (Exception ex) { ShowErr(ex); }
     }
 
+    private void RenameUser()
+    {
+        var u = SelUser(); if (u == null) return;
+        if (string.Equals(u, Environment.UserName, StringComparison.OrdinalIgnoreCase))
+        { MessageBox.Show(Loc.T("cantRenameSelf"), Loc.T("warn"), MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+        var newName = InputDialog.Show(this, Loc.T("renameUser"), Loc.T("promptNewName"), initial: u);
+        if (string.IsNullOrWhiteSpace(newName) || string.Equals(newName.Trim(), u, StringComparison.Ordinal)) return;
+        try { UserManager.RenameUser(u, newName.Trim()); RefreshUsers(); } catch (Exception ex) { ShowErr(ex); }
+    }
+
     private void DeleteUser()
     {
         var u = SelUser(); if (u == null) return;
@@ -136,7 +150,8 @@ public partial class MainForm
 
     private void ApplyUsersLanguage()
     {
-        _btnRefUsers.Text = Loc.T("refresh"); _btnNewUser.Text = Loc.T("newUser"); _btnDelUser.Text = Loc.T("delUser");
+        _btnRefUsers.Text = Loc.T("refresh"); _btnNewUser.Text = Loc.T("newUser");
+        _btnRenameUser.Text = Loc.T("renameUser"); _btnDelUser.Text = Loc.T("delUser");
         _btnResetPwd.Text = Loc.T("resetPwd"); _btnEnUser.Text = Loc.T("enableUser"); _btnDisUser.Text = Loc.T("disableUser");
         _uName.Text = Loc.T("colName"); _uFull.Text = Loc.T("colFullName"); _uStatus.Text = Loc.T("colStatus");
         _uNever.Text = Loc.T("colNeverExp"); _uDesc.Text = Loc.T("colDesc");
