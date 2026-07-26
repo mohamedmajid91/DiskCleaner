@@ -5,7 +5,7 @@ namespace DiskCleaner;
 /// <summary>ثوابت التطبيق ومساراته.</summary>
 public static class App
 {
-    public const string Version   = "2.3.1";
+    public const string Version   = "2.3.2";
     public const string RepoOwner = "mohamedmajid91";
     public const string RepoName  = "DiskCleaner";
     public const string Author    = "Mohammed Majid";

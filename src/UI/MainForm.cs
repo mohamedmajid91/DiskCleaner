@@ -74,8 +74,8 @@ public partial class MainForm : Form
         _titleBar.Paint += (_, e) =>
         {
             var r = _titleBar.ClientRectangle; if (r.Width <= 0) return;
-            using var b = new LinearGradientBrush(r, Theme.Accent, Theme.Purple, 0f);
-            e.Graphics.FillRectangle(b, r);
+            using (var b = new SolidBrush(Theme.TitleBar)) e.Graphics.FillRectangle(b, r);
+            using (var a = new SolidBrush(Theme.Accent)) e.Graphics.FillRectangle(a, 0, r.Height - 2, r.Width, 2);
         };
         _titleBar.MouseDown += TitleDrag;
         _titleBar.MouseDoubleClick += (_, _) => ToggleMaximize();
@@ -103,7 +103,6 @@ public partial class MainForm : Form
         // ---- منطقة المحتوى ----
         _content = new Panel { BackColor = Theme.Dark, Dock = DockStyle.Fill };
         Controls.Add(_content);
-        _content.BringToFront();
 
         // أنشئ الأقسام
         _tpDashboard = NewSection(); _tpClean = NewSection(); _tpLarge = NewSection(); _tpDup = NewSection();
@@ -160,11 +159,17 @@ public partial class MainForm : Form
         BuildTray();
         Resize += (_, _) => { if (WindowState == FormWindowState.Minimized) { Hide(); _tray.ShowBalloonTip(1500, "Disk & RAM Cleaner", Loc.T("trayMin"), ToolTipIcon.Info); } };
         FormClosing += (_, _) => { SaveSettings(); Logger.Log("Closed"); try { _cpuTimer.Stop(); _tray.Visible = false; _tray.Dispose(); } catch { } };
+
+        // ترتيب الإرساء: العنوان يمتد بعرض النافذة كامل فوق القائمة والمحتوى
+        Controls.SetChildIndex(_content, 0);
+        Controls.SetChildIndex(_sidebar, 1);
+        Controls.SetChildIndex(_titleBar, 2);
     }
 
     private Panel NewSection()
     {
-        var p = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Dark, Visible = false, Padding = new Padding(16, 12, 16, 12) };
+        // حجم صريح مطابق لمنطقة المحتوى حتى تُحسب مراجع الإرساء (Anchor) بشكل صحيح
+        var p = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Dark, Visible = false, Size = new Size(740, 594), Padding = new Padding(16, 12, 16, 12) };
         _content.Controls.Add(p);
         return p;
     }
