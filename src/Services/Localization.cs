@@ -162,6 +162,10 @@ public static class Loc
         ["powerPlan"]    = ("Power plan:", "خطة الطاقة:"),
         ["powerHigh"]    = ("High performance", "أداء عالٍ"),
         ["powerBalanced"]= ("Balanced", "متوازن"),
+        ["cpuHigh"]      = ("High CPU load", "حمل عالٍ على المعالج"),
+        ["cores"]        = ("cores", "نواة"),
+        ["cpuHistory"]   = ("CPU usage", "استخدام المعالج"),
+        ["searchProc"]   = ("Search process...", "بحث عن عملية..."),
     };
 
     /// <summary>يرجّع النص حسب اللغة الحالية.</summary>

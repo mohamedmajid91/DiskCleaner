@@ -35,6 +35,10 @@ public partial class MainForm : Form
 
     // اللوحة الرئيسية
     private Label _cardDiskVal = null!, _cardRamVal = null!, _cardCpuVal = null!, _cardFreedVal = null!;
+    private Panel _cpuGraph = null!;
+    private Label _cpuInfoLbl = null!;
+    private readonly List<int> _cpuHistory = new();
+    private int _highLoadStreak;
 
     private NotifyIcon _tray = null!;
     private ToolStripMenuItem _miShow = null!, _miRam = null!, _miExit = null!;
@@ -153,7 +157,14 @@ public partial class MainForm : Form
         _ramTimer.Tick += (_, _) => { DiskCleaner.Core.NativeMemory.FreeAll(); UpdateHeader(); _status.Text = $"{Loc.T("ramDone")} @ {DateTime.Now:HH:mm}"; Logger.Log("Auto RAM free");
             if (!Visible) _tray.ShowBalloonTip(1500, "Disk & RAM Cleaner", Loc.T("ramDone"), ToolTipIcon.Info); };
         _cpuTimer = new System.Windows.Forms.Timer { Interval = 1500 };
-        _cpuTimer.Tick += (_, _) => { _cpuPct = SystemInfo.GetCpuUsage(); _cpuBar.Invalidate(); if (_tpDashboard.Visible) RefreshDashboard(); };
+        _cpuTimer.Tick += (_, _) =>
+        {
+            _cpuPct = SystemInfo.GetCpuUsage(); _cpuBar.Invalidate();
+            _cpuHistory.Add(_cpuPct); if (_cpuHistory.Count > 120) _cpuHistory.RemoveAt(0);
+            if (_tpDashboard.Visible) { _cpuGraph.Invalidate(); RefreshDashboard(); }
+            if (_cpuPct >= 90) { _highLoadStreak++; if (_highLoadStreak == 6 && !Visible) _tray.ShowBalloonTip(2500, "Disk & RAM Cleaner", $"{Loc.T("cpuHigh")} ({_cpuPct}%)", ToolTipIcon.Warning); }
+            else _highLoadStreak = 0;
+        };
         _cpuTimer.Start();
 
         BuildTray();
@@ -257,13 +268,22 @@ public partial class MainForm : Form
         tp.Controls.Add(head);
 
         _cardDiskVal  = AddCard(tp, 4, 52, Theme.Accent, "cardDisk", out _);
-        _cardRamVal   = AddCard(tp, 250, 52, Theme.Purple, "cardRam", out _);
-        _cardCpuVal   = AddCard(tp, 4, 168, Color.FromArgb(0,150,180), "cardCpu", out _);
-        _cardFreedVal = AddCard(tp, 250, 168, Color.FromArgb(210,150,50), "cardFreed", out _);
+        _cardRamVal   = AddCard(tp, 250, 52, Color.FromArgb(45,140,110), "cardRam", out _);
+        _cardCpuVal   = AddCard(tp, 4, 168, Color.FromArgb(84,158,168), "cardCpu", out _);
+        _cardFreedVal = AddCard(tp, 250, 168, Color.FromArgb(205,160,60), "cardFreed", out _);
 
-        var bRam = MakeBtn(4, 300, 240, Theme.Purple, Theme.PurpleH); bRam.Name = "dashRam";
+        // رسم بياني حيّ للمعالج
+        _cpuGraph = new Panel { Location = new(500, 52), Size = new(232, 220), BackColor = Theme.Panel };
+        _cpuGraph.Paint += CpuGraph_Paint;
+        _cpuGraph.Resize += (_, _) => _cpuGraph.Invalidate();
+        tp.Controls.Add(_cpuGraph);
+
+        _cpuInfoLbl = new Label { ForeColor = Theme.Muted, Font = Theme.Main, Location = new(4, 284), Size = new(728, 22) };
+        tp.Controls.Add(_cpuInfoLbl);
+
+        var bRam = MakeBtn(4, 316, 240, Theme.Purple, Theme.PurpleH); bRam.Name = "dashRam";
         bRam.Click += (_, _) => RunFreeRam();
-        var bClean = MakeBtn(252, 300, 240, Theme.Accent, Theme.AccentH); bClean.Name = "dashClean";
+        var bClean = MakeBtn(252, 316, 240, Theme.Accent, Theme.AccentH); bClean.Name = "dashClean";
         bClean.Click += (_, _) => ShowSection(1);
         tp.Controls.AddRange(new Control[] { bRam, bClean });
     }
@@ -286,6 +306,22 @@ public partial class MainForm : Form
         _cardRamVal.Text = $"{r.usedPct}%";
         _cardCpuVal.Text = $"{_cpuPct}%";
         _cardFreedVal.Text = $"{History.TotalFreedGb():N1} GB";
+        _cpuInfoLbl.Text = $"{SystemInfo.CpuName()}  ·  {Environment.ProcessorCount} {Loc.T("cores")}";
+    }
+
+    private void CpuGraph_Paint(object? sender, PaintEventArgs e)
+    {
+        var g = e.Graphics; int w = _cpuGraph.ClientSize.Width, h = _cpuGraph.ClientSize.Height;
+        if (w <= 0 || h <= 0) return;
+        using (var bg = new SolidBrush(Theme.Panel)) g.FillRectangle(bg, 0, 0, w, h);
+        using (var grid = new Pen(Color.FromArgb(60, 64, 72))) for (int i = 1; i < 4; i++) { int gy = h * i / 4; g.DrawLine(grid, 0, gy, w, gy); }
+        using (var f = new Font("Segoe UI", 8F, FontStyle.Bold)) using (var tb = new SolidBrush(Theme.Muted))
+            g.DrawString($"{Loc.T("cpuHistory")}  {_cpuPct}%", f, tb, 6, 4);
+        if (_cpuHistory.Count < 2) return;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        int n = _cpuHistory.Count; var pts = new PointF[n];
+        for (int i = 0; i < n; i++) { float x = (float)i / (n - 1) * (w - 4) + 2; float y = h - 2 - (_cpuHistory[i] / 100f * (h - 26)); pts[i] = new PointF(x, y); }
+        using var pen = new Pen(Theme.Accent, 2f); g.DrawLines(pen, pts);
     }
 
     // ===================== تبويب التنظيف =====================

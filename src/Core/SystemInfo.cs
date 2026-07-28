@@ -61,4 +61,15 @@ public static class SystemInfo
     /// <summary>أقراص ثابتة متاحة (C:, D:, ...).</summary>
     public static IEnumerable<DriveInfo> FixedDrives() =>
         DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.Fixed && d.IsReady);
+
+    /// <summary>اسم المعالج من الرجستري.</summary>
+    public static string CpuName()
+    {
+        try
+        {
+            using var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
+            return (k?.GetValue("ProcessorNameString") as string ?? "CPU").Trim();
+        }
+        catch { return "CPU"; }
+    }
 }
