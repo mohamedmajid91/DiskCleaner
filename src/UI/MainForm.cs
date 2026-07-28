@@ -24,7 +24,8 @@ public partial class MainForm : Form
 
     // أقسام (لوحات)
     private Panel _tpDashboard = null!, _tpClean = null!, _tpLarge = null!, _tpDup = null!, _tpUninstall = null!,
-                 _tpStartup = null!, _tpProc = null!, _tpSched = null!, _tpHistory = null!, _tpUsers = null!;
+                 _tpStartup = null!, _tpProc = null!, _tpSched = null!, _tpHistory = null!, _tpUsers = null!,
+                 _tpServices = null!, _tpTasks = null!;
 
     // عناصر تبويب التنظيف
     private Panel _ramBar = null!, _cpuBar = null!, _catPanel = null!, _chart = null!;
@@ -66,8 +67,8 @@ public partial class MainForm : Form
     private void BuildUi()
     {
         Text = "Disk & RAM Cleaner";
-        ClientSize = new Size(920, 640);
-        MinimumSize = new Size(820, 560);
+        ClientSize = new Size(920, 660);
+        MinimumSize = new Size(860, 660);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.None;
         BackColor = Theme.Dark; ForeColor = Theme.TextCol; Font = Theme.Main;
@@ -101,7 +102,7 @@ public partial class MainForm : Form
         _titleBar.Resize += (_, _) => { LayoutWinButtons(); _titleBar.Invalidate(); };
 
         // ---- القائمة الجانبية ----
-        _sidebar = new Panel { Location = new(0, 46), Size = new(180, 594), Dock = DockStyle.Left, BackColor = Theme.Panel };
+        _sidebar = new Panel { Location = new(0, 46), Size = new(180, 614), Dock = DockStyle.Left, BackColor = Theme.Panel };
         Controls.Add(_sidebar);
 
         // ---- منطقة المحتوى ----
@@ -111,7 +112,7 @@ public partial class MainForm : Form
         // أنشئ الأقسام
         _tpDashboard = NewSection(); _tpClean = NewSection(); _tpLarge = NewSection(); _tpDup = NewSection();
         _tpUninstall = NewSection(); _tpStartup = NewSection(); _tpProc = NewSection(); _tpUsers = NewSection();
-        _tpSched = NewSection(); _tpHistory = NewSection();
+        _tpServices = NewSection(); _tpTasks = NewSection(); _tpSched = NewSection(); _tpHistory = NewSection();
 
         BuildDashboard(_tpDashboard);
         BuildCleanTab(_tpClean);
@@ -121,6 +122,8 @@ public partial class MainForm : Form
         BuildStartupTab(_tpStartup);
         BuildProcessTab(_tpProc);
         BuildUsersTab(_tpUsers);
+        BuildServicesTab(_tpServices);
+        BuildTasksTab(_tpTasks);
         BuildScheduleTab(_tpSched);
         BuildHistoryTab(_tpHistory);
 
@@ -132,24 +135,26 @@ public partial class MainForm : Form
         AddNav("tabUninstall", _tpUninstall);
         AddNav("tabStartup",   _tpStartup);
         AddNav("tabProc",      _tpProc);
+        AddNav("tabServices",  _tpServices);
+        AddNav("tabTasks",     _tpTasks);
         AddNav("tabUsers",     _tpUsers);
         AddNav("tabSchedule",  _tpSched);
         AddNav("tabHistory",   _tpHistory);
 
         // أسفل القائمة: اللغة + التحديث + الإصدار
-        _btnLang = new Button { Size = new(150, 30), Location = new(15, 470), FlatStyle = FlatStyle.Flat,
+        _btnLang = new Button { Size = new(150, 30), Location = new(15, 528), FlatStyle = FlatStyle.Flat,
             BackColor = Theme.Gray, ForeColor = Theme.TextCol, Font = Theme.Main, Cursor = Cursors.Hand, Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
         _btnLang.FlatAppearance.BorderSize = 0;
         _btnLang.Click += (_, _) => { Loc.Lang = Loc.Lang == "ar" ? "en" : "ar"; ApplyLanguage(); SaveSettings(); };
         _sidebar.Controls.Add(_btnLang);
 
         _lnkUpdate = new LinkLabel { LinkColor = Theme.Link, ActiveLinkColor = Theme.AccentH, Font = Theme.Main,
-            Location = new(15, 508), Size = new(160, 20), Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
+            Location = new(15, 566), Size = new(160, 20), Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
         _lnkUpdate.LinkClicked += async (_, _) => await CheckUpdate();
         _sidebar.Controls.Add(_lnkUpdate);
 
         _credit = new Label { Text = $"v{App.Version} · Mohammed Majid", ForeColor = Theme.Muted, Font = new Font("Segoe UI", 8F),
-            Location = new(15, 532), Size = new(160, 18), Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
+            Location = new(15, 590), Size = new(160, 18), Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
         _sidebar.Controls.Add(_credit);
 
         // مؤقتات
@@ -180,7 +185,7 @@ public partial class MainForm : Form
     private Panel NewSection()
     {
         // حجم صريح مطابق لمنطقة المحتوى حتى تُحسب مراجع الإرساء (Anchor) بشكل صحيح
-        var p = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Dark, Visible = false, Size = new Size(740, 594), Padding = new Padding(16, 12, 16, 12) };
+        var p = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Dark, Visible = false, Size = new Size(740, 614), Padding = new Padding(16, 12, 16, 12) };
         _content.Controls.Add(p);
         return p;
     }
@@ -281,11 +286,13 @@ public partial class MainForm : Form
         _cpuInfoLbl = new Label { ForeColor = Theme.Muted, Font = Theme.Main, Location = new(4, 284), Size = new(728, 22) };
         tp.Controls.Add(_cpuInfoLbl);
 
-        var bRam = MakeBtn(4, 316, 240, Theme.Purple, Theme.PurpleH); bRam.Name = "dashRam";
+        var bBoost = MakeBtn(4, 316, 300, Color.FromArgb(45,140,110), Color.FromArgb(56,160,126)); bBoost.Name = "dashBoost";
+        bBoost.Click += (_, _) => RunBoost();
+        var bRam = MakeBtn(312, 316, 200, Theme.Purple, Theme.PurpleH); bRam.Name = "dashRam";
         bRam.Click += (_, _) => RunFreeRam();
-        var bClean = MakeBtn(252, 316, 240, Theme.Accent, Theme.AccentH); bClean.Name = "dashClean";
+        var bClean = MakeBtn(520, 316, 210, Theme.Accent, Theme.AccentH); bClean.Name = "dashClean";
         bClean.Click += (_, _) => ShowSection(1);
-        tp.Controls.AddRange(new Control[] { bRam, bClean });
+        tp.Controls.AddRange(new Control[] { bBoost, bRam, bClean });
     }
 
     private Label AddCard(Panel parent, int x, int y, Color accent, string titleName, out Label title)
@@ -468,6 +475,7 @@ public partial class MainForm : Form
         SetText(_tpDashboard, "cardRam", Loc.T("ramUsed"));
         SetText(_tpDashboard, "cardCpu", "CPU");
         SetText(_tpDashboard, "cardFreed", Loc.T("totalFreed"));
+        SetBtn(_tpDashboard, "dashBoost", Loc.T("boost"));
         SetBtn(_tpDashboard, "dashRam", Loc.T("freeRam"));
         SetBtn(_tpDashboard, "dashClean", Loc.T("tabClean"));
         RefreshDashboard();
@@ -478,7 +486,7 @@ public partial class MainForm : Form
         foreach (var c in _cats) _checks[c.Key].Text = c.Name(Loc.Lang);
         _total.Text = _analyzed ? $"{Loc.T("totalClean")}: {Theme.FormatSize(_lastTotal)}" : Loc.T("pressAnalyze");
 
-        ApplyTabsLanguage(); ApplyUninstallLanguage(); ApplyUsersLanguage();
+        ApplyTabsLanguage(); ApplyUninstallLanguage(); ApplyUsersLanguage(); ApplySystemLanguage();
         UpdateHeader();
         ResumeLayout(); Refresh();
     }
@@ -537,6 +545,15 @@ public partial class MainForm : Form
         var a = SystemInfo.GetRam(); UpdateHeader(); _status.Text = Loc.T("ramDone"); _btnRam.Enabled = true;
         double freed = Math.Round(a.freeGb - b.freeGb, 2); Logger.Log($"RAM freed: {freed} GB");
         MessageBox.Show($"{Loc.T("ramDone")}\n\n{Loc.T("before")}: {b.freeGb} GB ({b.usedPct}% {Loc.T("used")})\n{Loc.T("after")}: {a.freeGb} GB ({a.usedPct}% {Loc.T("used")})\n{Loc.T("freed")}: {freed} GB", Loc.T("ramTitle"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private void RunBoost()
+    {
+        PowerPlan.HighPerformance();
+        DiskCleaner.Core.NativeMemory.FreeAll();
+        _cpuPct = SystemInfo.GetCpuUsage(); UpdateHeader(); RefreshDashboard();
+        Logger.Log("Boost applied");
+        MessageBox.Show(Loc.T("boostDone"), Loc.T("boost"), MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     private void Auto_Changed(object? sender, EventArgs e)

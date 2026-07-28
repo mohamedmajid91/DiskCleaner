@@ -56,6 +56,8 @@ public static partial class Cleaner
             new() { Key="crashdumps", NameEn="Crash dumps & error reports", NameAr="تقارير الأخطاء والكراش",
                 Paths=[@"C:\ProgramData\Microsoft\Windows\WER\ReportQueue", @"C:\ProgramData\Microsoft\Windows\WER\ReportArchive", Path.Combine(win,"Minidump")],
                 Files=[Path.Combine(win,"MEMORY.DMP")] },
+            new() { Key="winlogs", NameEn="Old Windows logs", NameAr="سجلّات ويندوز القديمة",
+                Paths=[Path.Combine(win,"Logs","CBS")], Files=[Path.Combine(win,"Logs","DISM","*.log")] },
             new() { Key="recyclebin", NameEn="Recycle Bin", NameAr="سلة المحذوفات", Special=SpecialKind.RecycleBin },
         };
     }

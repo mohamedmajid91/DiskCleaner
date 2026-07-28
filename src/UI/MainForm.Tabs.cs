@@ -26,7 +26,7 @@ public partial class MainForm
     private ColumnHeader _sName = null!, _sStatus = null!, _sScope = null!, _sCmd = null!;
 
     // ---- العمليات ----
-    private Button _btnRefProc = null!, _btnKill = null!, _btnPrioNormal = null!, _btnPrioBelow = null!, _btnPrioIdle = null!;
+    private Button _btnRefProc = null!, _btnKill = null!, _btnSuspend = null!, _btnResume = null!, _btnPrioNormal = null!, _btnPrioBelow = null!, _btnPrioIdle = null!;
     private Button _btnPwrHigh = null!, _btnPwrBal = null!;
     private Label _lblPower = null!;
     private TextBox _procSearch = null!;
@@ -171,9 +171,9 @@ public partial class MainForm
         foreach (var s in StartupManager.List())
         {
             var it = new ListViewItem(s.Name);
-            it.SubItems.Add(s.Enabled ? Loc.T("enabled") : Loc.T("disabled"));
+            it.SubItems.Add(s.Suspicious ? "⚠ " + Loc.T("suspicious") : (s.Enabled ? Loc.T("enabled") : Loc.T("disabled")));
             it.SubItems.Add(s.Scope); it.SubItems.Add(s.Command);
-            it.ForeColor = s.Enabled ? Theme.TextCol : Theme.Muted;
+            it.ForeColor = s.Suspicious ? Color.FromArgb(230, 130, 90) : (s.Enabled ? Theme.TextCol : Theme.Muted);
             _lvStartup.Items.Add(it);
         }
     }
@@ -187,21 +187,27 @@ public partial class MainForm
     // ============================ العمليات ============================
     private void BuildProcessTab(Panel tp)
     {
-        // الصف الأول: تحديث + إنهاء + أزرار الأولوية
-        _btnRefProc    = MakeBtn(12, 8, 96, Theme.Accent, Theme.AccentH); _btnRefProc.Size = new(96, 28);
-        _btnKill       = MakeBtn(112, 8, 96, Theme.Gray, Theme.GrayH);    _btnKill.Size = new(96, 28);
-        _btnPrioNormal = MakeBtn(220, 8, 118, Theme.Gray, Theme.GrayH);   _btnPrioNormal.Size = new(118, 28);
-        _btnPrioBelow  = MakeBtn(342, 8, 118, Theme.Gray, Theme.GrayH);   _btnPrioBelow.Size = new(118, 28);
-        _btnPrioIdle   = MakeBtn(464, 8, 118, Theme.Gray, Theme.GrayH);   _btnPrioIdle.Size = new(118, 28);
-        // الصف الثاني: خطة الطاقة
-        _lblPower  = new Label { ForeColor = Theme.Muted, Location = new(12, 44), Size = new(90, 24), TextAlign = ContentAlignment.MiddleLeft };
-        _btnPwrHigh = MakeBtn(104, 42, 150, Theme.Purple, Theme.PurpleH); _btnPwrHigh.Size = new(150, 26);
-        _btnPwrBal  = MakeBtn(260, 42, 120, Theme.Gray, Theme.GrayH);     _btnPwrBal.Size = new(120, 26);
-        _procSearch = new TextBox { Location = new(392, 42), Size = new(196, 26), BackColor = Theme.Panel, ForeColor = Theme.TextCol,
+        // الصف الأول: تحديث + إنهاء + تعليق/استئناف
+        _btnRefProc = MakeBtn(4, 6, 90, Theme.Accent, Theme.AccentH); _btnRefProc.Size = new(90, 28);
+        _btnKill    = MakeBtn(98, 6, 84, Theme.Gray, Theme.GrayH);    _btnKill.Size = new(84, 28);
+        _btnSuspend = MakeBtn(186, 6, 92, Theme.Gray, Theme.GrayH);   _btnSuspend.Size = new(92, 28);
+        _btnResume  = MakeBtn(282, 6, 92, Theme.Gray, Theme.GrayH);   _btnResume.Size = new(92, 28);
+        // الصف الثاني: الأولوية + بحث
+        _btnPrioNormal = MakeBtn(4, 38, 110, Theme.Gray, Theme.GrayH);  _btnPrioNormal.Size = new(110, 28);
+        _btnPrioBelow  = MakeBtn(120, 38, 100, Theme.Gray, Theme.GrayH); _btnPrioBelow.Size = new(100, 28);
+        _btnPrioIdle   = MakeBtn(226, 38, 96, Theme.Gray, Theme.GrayH);  _btnPrioIdle.Size = new(96, 28);
+        _procSearch = new TextBox { Location = new(500, 38), Size = new(228, 26), BackColor = Theme.Panel, ForeColor = Theme.TextCol,
             BorderStyle = BorderStyle.FixedSingle, Anchor = AnchorStyles.Top | AnchorStyles.Right };
         _procSearch.TextChanged += (_, _) => PopulateProc(_procSearch.Text);
+        // الصف الثالث: خطة الطاقة
+        _lblPower  = new Label { ForeColor = Theme.Muted, Location = new(4, 72), Size = new(60, 24), TextAlign = ContentAlignment.MiddleLeft };
+        _btnPwrHigh = MakeBtn(68, 70, 140, Theme.Purple, Theme.PurpleH); _btnPwrHigh.Size = new(140, 26);
+        _btnPwrBal  = MakeBtn(214, 70, 120, Theme.Gray, Theme.GrayH);    _btnPwrBal.Size = new(120, 26);
 
-        _lvProc = MakeList(12, 78, 576, 416); StyleList(_lvProc);
+        _btnSuspend.Click += (_, _) => SuspendProc(true);
+        _btnResume.Click  += (_, _) => SuspendProc(false);
+
+        _lvProc = MakeList(4, 104, 724, 496); StyleList(_lvProc);
         _pName = _lvProc.Columns.Add("Name", 250); _pPid = _lvProc.Columns.Add("PID", 70);
         _pCpu = _lvProc.Columns.Add("CPU", 70); _pMem = _lvProc.Columns.Add("Memory", 110);
 
@@ -213,8 +219,14 @@ public partial class MainForm
         _btnPwrHigh.Click    += (_, _) => { PowerPlan.HighPerformance(); _lblStatusFlash(_lblPower); };
         _btnPwrBal.Click     += (_, _) => { PowerPlan.Balanced(); _lblStatusFlash(_lblPower); };
 
-        tp.Controls.AddRange(new Control[] { _btnRefProc, _btnKill, _btnPrioNormal, _btnPrioBelow, _btnPrioIdle,
+        tp.Controls.AddRange(new Control[] { _btnRefProc, _btnKill, _btnSuspend, _btnResume, _btnPrioNormal, _btnPrioBelow, _btnPrioIdle,
             _lblPower, _btnPwrHigh, _btnPwrBal, _procSearch, _lvProc });
+    }
+
+    private void SuspendProc(bool suspend)
+    {
+        if (_lvProc.SelectedItems.Count == 0) return;
+        if (int.TryParse(_lvProc.SelectedItems[0].SubItems[1].Text, out var pid)) ProcessMonitor.Suspend(pid, suspend);
     }
 
     private static void _lblStatusFlash(Label l) { l.ForeColor = Theme.AccentH; }
@@ -317,6 +329,7 @@ public partial class MainForm
         _sName.Text = Loc.T("colName"); _sStatus.Text = Loc.T("colStatus"); _sScope.Text = Loc.T("colScope"); _sCmd.Text = Loc.T("colCommand");
 
         _btnRefProc.Text = Loc.T("refresh"); _btnKill.Text = Loc.T("kill");
+        _btnSuspend.Text = Loc.T("suspend"); _btnResume.Text = Loc.T("resume");
         _btnPrioNormal.Text = Loc.T("prioNormal"); _btnPrioBelow.Text = Loc.T("prioBelow"); _btnPrioIdle.Text = Loc.T("prioIdle");
         _lblPower.Text = Loc.T("powerPlan"); _btnPwrHigh.Text = Loc.T("powerHigh"); _btnPwrBal.Text = Loc.T("powerBalanced");
         _procSearch.PlaceholderText = Loc.T("searchProc");

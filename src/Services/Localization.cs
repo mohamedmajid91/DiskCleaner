@@ -166,6 +166,33 @@ public static class Loc
         ["cores"]        = ("cores", "نواة"),
         ["cpuHistory"]   = ("CPU usage", "استخدام المعالج"),
         ["searchProc"]   = ("Search process...", "بحث عن عملية..."),
+        ["suspend"]      = ("Suspend", "تعليق"),
+        ["resume"]       = ("Resume", "استئناف"),
+        ["boost"]        = ("Boost (RAM + CPU)", "تسريع (رام + معالج)"),
+        ["boostDone"]    = ("Boosted: RAM freed + high-performance power plan.", "تم التسريع: تحرير رام + خطة أداء عالٍ."),
+
+        // الخدمات
+        ["tabServices"]  = ("Services", "الخدمات"),
+        ["svcStart"]     = ("Start", "تشغيل"),
+        ["svcStop"]      = ("Stop", "إيقاف"),
+        ["svcAuto"]      = ("Automatic", "تلقائي"),
+        ["svcManual"]    = ("Manual", "يدوي"),
+        ["svcDisable"]   = ("Disable", "تعطيل"),
+        ["colDisplay"]   = ("Service", "الخدمة"),
+        ["colStartType"] = ("Startup", "البدء"),
+        ["searchSvc"]    = ("Search service...", "بحث عن خدمة..."),
+
+        // المهام المجدولة
+        ["tabTasks"]     = ("Scheduled tasks", "المهام المجدولة"),
+        ["taskEnable"]   = ("Enable", "تفعيل"),
+        ["taskDisable"]  = ("Disable", "تعطيل"),
+        ["taskDelete"]   = ("Delete", "حذف"),
+        ["colTask"]      = ("Task", "المهمة"),
+        ["colNextRun"]   = ("Next run", "التشغيل القادم"),
+        ["confirmDelTask"]=("Delete this scheduled task?", "حذف هذه المهمة المجدولة؟"),
+
+        // مشبوه
+        ["suspicious"]   = ("Suspicious", "مشبوه"),
     };
 
     /// <summary>يرجّع النص حسب اللغة الحالية.</summary>

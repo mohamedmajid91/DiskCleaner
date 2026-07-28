@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using DiskCleaner.Services;
 
 namespace DiskCleaner.Core;
@@ -47,6 +48,22 @@ public static class ProcessMonitor
             return true;
         }
         catch (Exception ex) { Logger.Log($"SetPriority {pid} failed: {ex.Message}"); return false; }
+    }
+
+    [DllImport("ntdll.dll")] private static extern int NtSuspendProcess(IntPtr handle);
+    [DllImport("ntdll.dll")] private static extern int NtResumeProcess(IntPtr handle);
+
+    /// <summary>تعليق/استئناف عملية (مؤقت — قابل للتراجع).</summary>
+    public static bool Suspend(int pid, bool suspend)
+    {
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            if (suspend) NtSuspendProcess(p.Handle); else NtResumeProcess(p.Handle);
+            Logger.Log($"{(suspend ? "Suspended" : "Resumed")} {p.ProcessName} ({pid})");
+            return true;
+        }
+        catch (Exception ex) { Logger.Log($"Suspend {pid} failed: {ex.Message}"); return false; }
     }
 
     public static bool Kill(int pid)

@@ -3,7 +3,7 @@ using DiskCleaner.Services;
 
 namespace DiskCleaner.Core;
 
-public sealed record StartupItem(string Name, string Command, string Scope, bool Enabled);
+public sealed record StartupItem(string Name, string Command, string Scope, bool Enabled, bool Suspicious);
 
 /// <summary>يقرأ ويعطّل برامج بدء التشغيل (مفاتيح Run + StartupApproved، تعطيل قابل للتراجع).</summary>
 public static class StartupManager
@@ -33,10 +33,18 @@ public static class StartupManager
                 bool enabled = true;
                 var b = approved?.GetValue(name) as byte[];
                 if (b is { Length: > 0 }) enabled = (b[0] & 0x01) == 0;   // فردي => معطّل
-                items.Add(new StartupItem(name, cmd, scope, enabled));
+                items.Add(new StartupItem(name, cmd, scope, enabled, IsSuspicious(cmd)));
             }
         }
         catch (Exception ex) { Logger.Log($"Startup read {scope} failed: {ex.Message}"); }
+    }
+
+    /// <summary>يعلّم كمشبوه إذا كان يشتغل من Temp أو مجلدات مؤقتة (نمط شائع للبرمجيات الضارة).</summary>
+    private static bool IsSuspicious(string command)
+    {
+        var c = command.ToLowerInvariant();
+        return c.Contains(@"\temp\") || c.Contains(@"\appdata\local\temp") || c.Contains(@"\windows\temp")
+            || c.Contains(@"\downloads\") || c.Contains(@"\programdata\") && c.Contains(".exe") && !c.Contains(@"\microsoft\");
     }
 
     /// <summary>يفعّل/يعطّل عنصر بدء تشغيل (يكتب StartupApproved، بدون حذف مفتاح Run).</summary>
