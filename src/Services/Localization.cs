@@ -170,6 +170,8 @@ public static class Loc
         ["resume"]       = ("Resume", "استئناف"),
         ["boost"]        = ("Boost (RAM + CPU)", "تسريع (رام + معالج)"),
         ["boostDone"]    = ("Boosted: RAM freed + high-performance power plan.", "تم التسريع: تحرير رام + خطة أداء عالٍ."),
+        ["restoreBoost"] = ("Undo Boost", "تراجع عن التسريع"),
+        ["boostRestored"]= ("Power plan restored.", "رجعت خطة الطاقة السابقة."),
 
         // الخدمات
         ["tabServices"]  = ("Services", "الخدمات"),

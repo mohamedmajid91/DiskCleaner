@@ -38,8 +38,11 @@ public partial class MainForm : Form
     private Label _cardDiskVal = null!, _cardRamVal = null!, _cardCpuVal = null!, _cardFreedVal = null!;
     private Panel _cpuGraph = null!;
     private Label _cpuInfoLbl = null!;
+    private Button _btnBoost = null!;
     private readonly List<int> _cpuHistory = new();
     private int _highLoadStreak;
+    private string? _prevScheme;
+    private bool _boosted;
 
     private NotifyIcon _tray = null!;
     private ToolStripMenuItem _miShow = null!, _miRam = null!, _miExit = null!;
@@ -286,13 +289,13 @@ public partial class MainForm : Form
         _cpuInfoLbl = new Label { ForeColor = Theme.Muted, Font = Theme.Main, Location = new(4, 284), Size = new(728, 22) };
         tp.Controls.Add(_cpuInfoLbl);
 
-        var bBoost = MakeBtn(4, 316, 300, Color.FromArgb(45,140,110), Color.FromArgb(56,160,126)); bBoost.Name = "dashBoost";
-        bBoost.Click += (_, _) => RunBoost();
+        _btnBoost = MakeBtn(4, 316, 300, Color.FromArgb(45,140,110), Color.FromArgb(56,160,126)); _btnBoost.Name = "dashBoost";
+        _btnBoost.Click += (_, _) => RunBoost();
         var bRam = MakeBtn(312, 316, 200, Theme.Purple, Theme.PurpleH); bRam.Name = "dashRam";
         bRam.Click += (_, _) => RunFreeRam();
         var bClean = MakeBtn(520, 316, 210, Theme.Accent, Theme.AccentH); bClean.Name = "dashClean";
         bClean.Click += (_, _) => ShowSection(1);
-        tp.Controls.AddRange(new Control[] { bBoost, bRam, bClean });
+        tp.Controls.AddRange(new Control[] { _btnBoost, bRam, bClean });
     }
 
     private Label AddCard(Panel parent, int x, int y, Color accent, string titleName, out Label title)
@@ -475,7 +478,7 @@ public partial class MainForm : Form
         SetText(_tpDashboard, "cardRam", Loc.T("ramUsed"));
         SetText(_tpDashboard, "cardCpu", "CPU");
         SetText(_tpDashboard, "cardFreed", Loc.T("totalFreed"));
-        SetBtn(_tpDashboard, "dashBoost", Loc.T("boost"));
+        _btnBoost.Text = _boosted ? Loc.T("restoreBoost") : Loc.T("boost");
         SetBtn(_tpDashboard, "dashRam", Loc.T("freeRam"));
         SetBtn(_tpDashboard, "dashClean", Loc.T("tabClean"));
         RefreshDashboard();
@@ -551,11 +554,23 @@ public partial class MainForm : Form
 
     private void RunBoost()
     {
-        PowerPlan.HighPerformance();
-        DiskCleaner.Core.NativeMemory.FreeAll();
-        _cpuPct = SystemInfo.GetCpuUsage(); UpdateHeader(); RefreshDashboard();
-        Logger.Log("Boost applied");
-        MessageBox.Show(Loc.T("boostDone"), Loc.T("boost"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+        if (!_boosted)
+        {
+            _prevScheme = PowerPlan.GetActiveScheme();     // احفظ الخطة الحالية للرجوع
+            PowerPlan.HighPerformance();
+            DiskCleaner.Core.NativeMemory.FreeAll();
+            _boosted = true; _btnBoost.Text = Loc.T("restoreBoost");
+            _cpuPct = SystemInfo.GetCpuUsage(); UpdateHeader(); RefreshDashboard();
+            Logger.Log("Boost applied");
+            MessageBox.Show(Loc.T("boostDone"), Loc.T("boost"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        else
+        {
+            if (!string.IsNullOrEmpty(_prevScheme)) PowerPlan.RestoreScheme(_prevScheme); else PowerPlan.Balanced();
+            _boosted = false; _btnBoost.Text = Loc.T("boost");
+            Logger.Log("Boost reverted");
+            MessageBox.Show(Loc.T("boostRestored"), Loc.T("boost"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
     }
 
     private void Auto_Changed(object? sender, EventArgs e)
