@@ -142,19 +142,19 @@ public partial class MainForm : Form
         AddNav("tabHistory",   _tpHistory);
 
         // أسفل القائمة: اللغة + التحديث + الإصدار
-        _btnLang = new Button { Size = new(150, 30), Location = new(15, 528), FlatStyle = FlatStyle.Flat,
+        _btnLang = new Button { Size = new(150, 30), Location = new(15, 512), FlatStyle = FlatStyle.Flat,
             BackColor = Theme.Gray, ForeColor = Theme.TextCol, Font = Theme.Main, Cursor = Cursors.Hand, Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
         _btnLang.FlatAppearance.BorderSize = 0;
         _btnLang.Click += (_, _) => { Loc.Lang = Loc.Lang == "ar" ? "en" : "ar"; ApplyLanguage(); SaveSettings(); };
         _sidebar.Controls.Add(_btnLang);
 
         _lnkUpdate = new LinkLabel { LinkColor = Theme.Link, ActiveLinkColor = Theme.AccentH, Font = Theme.Main,
-            Location = new(15, 566), Size = new(160, 20), Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
+            Location = new(15, 548), Size = new(160, 20), Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
         _lnkUpdate.LinkClicked += async (_, _) => await CheckUpdate();
         _sidebar.Controls.Add(_lnkUpdate);
 
-        _credit = new Label { Text = $"v{App.Version} · Mohammed Majid", ForeColor = Theme.Muted, Font = new Font("Segoe UI", 8F),
-            Location = new(15, 590), Size = new(160, 18), Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
+        _credit = new Label { Text = $"Developer by Mohammed Majid\nv{App.Version}", ForeColor = Theme.Muted, Font = new Font("Segoe UI", 8F),
+            Location = new(15, 574), Size = new(165, 36), Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
         _sidebar.Controls.Add(_credit);
 
         // مؤقتات
@@ -369,7 +369,7 @@ public partial class MainForm : Form
         _chart.Paint += Chart_Paint; _chart.Resize += (_, _) => _chart.Invalidate();
         tp.Controls.Add(_chart);
 
-        _progress = new ProgressBar { Location = new(4, 348), Size = new(680, 14), Style = ProgressBarStyle.Continuous,
+        _progress = new ProgressBar { Location = new(4, 348), Size = new(680, 14), Style = ProgressBarStyle.Continuous, Visible = false,
             Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right };
         tp.Controls.Add(_progress);
 
@@ -498,7 +498,7 @@ public partial class MainForm : Form
     private void RunAnalyze()
     {
         _btnAnalyze.Enabled = _btnClean.Enabled = false;
-        _progress.Maximum = _cats.Count; _progress.Value = 0;
+        _progress.Maximum = _cats.Count; _progress.Value = 0; _progress.Visible = true;
         long total = 0; int i = 0;
         foreach (var c in _cats)
         {
@@ -511,6 +511,7 @@ public partial class MainForm : Form
         _total.Text = $"{Loc.T("totalClean")}: {Theme.FormatSize(total)}";
         _status.Text = Loc.T("doneAnalyze"); UpdateHeader(); _chart.Invalidate();
         Logger.Log($"Analyzed. Total: {Theme.FormatSize(total)}");
+        _progress.Value = 0; _progress.Visible = false;
         _btnAnalyze.Enabled = _btnClean.Enabled = true;
     }
 
@@ -523,7 +524,7 @@ public partial class MainForm : Form
         double before = SystemInfo.GetFreeGB();
         _btnAnalyze.Enabled = _btnClean.Enabled = false;
         if (_chkRestore.Checked) { _status.Text = Loc.T("restoring"); Application.DoEvents(); CreateRestorePoint(); }
-        _progress.Maximum = sel.Count; _progress.Value = 0; int i = 0;
+        _progress.Maximum = sel.Count; _progress.Value = 0; _progress.Visible = true; int i = 0;
         foreach (var c in sel)
         {
             i++; _status.Text = $"{Loc.T("cleaning")}: {c.Name(Loc.Lang)}..."; Application.DoEvents();
@@ -531,6 +532,7 @@ public partial class MainForm : Form
         }
         double after = SystemInfo.GetFreeGB(); double freed = Math.Round(after - before, 2);
         UpdateHeader(); _chart.Invalidate(); _status.Text = Loc.T("doneClean");
+        _progress.Value = 0; _progress.Visible = false;
         History.Add(freed, sel.Select(c => c.Key)); RefreshHistory();
         Logger.Log($"Cleaned [{string.Join(", ", sel.Select(c => c.Key))}]. Freed {freed} GB");
         _btnAnalyze.Enabled = _btnClean.Enabled = true;
@@ -589,7 +591,7 @@ public partial class MainForm : Form
 
             ShowSection(1);
             _lnkUpdate.Enabled = false;
-            _progress.Maximum = 100; _progress.Value = 0; _status.Text = Loc.T("downloading");
+            _progress.Maximum = 100; _progress.Value = 0; _progress.Visible = true; _status.Text = Loc.T("downloading");
             string newExe = Path.Combine(App.DataDir, "DiskCleaner_new.exe");
             var progress = new Progress<int>(p => { _progress.Value = Math.Clamp(p, 0, 100); _status.Text = $"{Loc.T("downloading")} {p}%"; });
             await Updater.DownloadAsync(newExe, progress);
