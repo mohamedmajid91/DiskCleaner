@@ -17,7 +17,7 @@ public partial class MainForm : Form
 
     // الهيكل الجديد
     private Panel _titleBar = null!, _sidebar = null!, _content = null!;
-    private Label _titleLbl = null!, _credit = null!;
+    private Label _titleLbl = null!, _credit = null!, _lblDevBy = null!;
     private Button _btnMin = null!, _btnMax = null!, _btnClose = null!, _btnLang = null!;
     private LinkLabel _lnkUpdate = null!;
     private readonly List<(Button nav, Panel panel, string key)> _sections = new();
@@ -156,9 +156,13 @@ public partial class MainForm : Form
         _lnkUpdate.LinkClicked += async (_, _) => await CheckUpdate();
         _sidebar.Controls.Add(_lnkUpdate);
 
-        _credit = new Label { Text = $"Developer by\nMohammed Majid\nv{App.Version}", ForeColor = Theme.Muted, Font = new Font("Segoe UI", 8F),
-            Location = new(15, 532), Size = new(160, 50), Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
-        _sidebar.Controls.Add(_credit);
+        var botAnchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        _lblDevBy = new Label { ForeColor = Theme.Muted, Font = new Font("Segoe UI", 8F), Location = new(15, 556), Size = new(160, 15), Anchor = botAnchor };
+        _credit = new Label { Text = "Mohammed Majid", ForeColor = Theme.TextCol, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+            Location = new(15, 571), Size = new(160, 22), Anchor = botAnchor };
+        var lblVer = new Label { Text = $"v{App.Version}", ForeColor = Theme.Accent, Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+            Location = new(15, 594), Size = new(160, 15), Anchor = botAnchor };
+        _sidebar.Controls.AddRange(new Control[] { _lblDevBy, _credit, lblVer });
 
         // مؤقتات
         _ramTimer = new System.Windows.Forms.Timer { Interval = 600000 };
@@ -468,7 +472,7 @@ public partial class MainForm : Form
         RightToLeft = Loc.IsRtl ? RightToLeft.Yes : RightToLeft.No;
         RightToLeftLayout = Loc.IsRtl;
         _titleLbl.Text = Loc.T("title");
-        _btnLang.Text = Loc.T("langBtn"); _lnkUpdate.Text = Loc.T("checkUpdate");
+        _btnLang.Text = Loc.T("langBtn"); _lnkUpdate.Text = Loc.T("checkUpdate"); _lblDevBy.Text = Loc.T("developedBy");
         foreach (var s in _sections) s.nav.Text = "  " + Loc.T(s.key);
         _miShow.Text = Loc.T("trayShow"); _miRam.Text = Loc.T("trayRam"); _miExit.Text = Loc.T("trayExit");
 

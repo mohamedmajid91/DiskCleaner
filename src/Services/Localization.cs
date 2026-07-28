@@ -165,6 +165,7 @@ public static class Loc
         ["cpuHigh"]      = ("High CPU load", "حمل عالٍ على المعالج"),
         ["cores"]        = ("cores", "نواة"),
         ["cpuHistory"]   = ("CPU usage", "استخدام المعالج"),
+        ["developedBy"]  = ("Developed by", "تطوير"),
         ["searchProc"]   = ("Search process...", "بحث عن عملية..."),
         ["suspend"]      = ("Suspend", "تعليق"),
         ["resume"]       = ("Resume", "استئناف"),
