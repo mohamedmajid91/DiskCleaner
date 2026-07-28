@@ -145,19 +145,19 @@ public partial class MainForm : Form
         AddNav("tabHistory",   _tpHistory);
 
         // أسفل القائمة: اللغة + التحديث + الإصدار
-        _btnLang = new Button { Size = new(150, 30), Location = new(15, 512), FlatStyle = FlatStyle.Flat,
+        _btnLang = new Button { Size = new(150, 30), Location = new(15, 470), FlatStyle = FlatStyle.Flat,
             BackColor = Theme.Gray, ForeColor = Theme.TextCol, Font = Theme.Main, Cursor = Cursors.Hand, Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
         _btnLang.FlatAppearance.BorderSize = 0;
         _btnLang.Click += (_, _) => { Loc.Lang = Loc.Lang == "ar" ? "en" : "ar"; ApplyLanguage(); SaveSettings(); };
         _sidebar.Controls.Add(_btnLang);
 
         _lnkUpdate = new LinkLabel { LinkColor = Theme.Link, ActiveLinkColor = Theme.AccentH, Font = Theme.Main,
-            Location = new(15, 548), Size = new(160, 20), Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
+            Location = new(15, 506), Size = new(160, 20), Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
         _lnkUpdate.LinkClicked += async (_, _) => await CheckUpdate();
         _sidebar.Controls.Add(_lnkUpdate);
 
-        _credit = new Label { Text = $"Developer by Mohammed Majid\nv{App.Version}", ForeColor = Theme.Muted, Font = new Font("Segoe UI", 8F),
-            Location = new(15, 574), Size = new(165, 36), Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
+        _credit = new Label { Text = $"Developer by\nMohammed Majid\nv{App.Version}", ForeColor = Theme.Muted, Font = new Font("Segoe UI", 8F),
+            Location = new(15, 532), Size = new(160, 50), Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
         _sidebar.Controls.Add(_credit);
 
         // مؤقتات
@@ -196,7 +196,7 @@ public partial class MainForm : Form
     private void AddNav(string key, Panel panel)
     {
         int idx = _sections.Count;
-        var b = new Button { Size = new(180, 40), Location = new(0, idx * 42), FlatStyle = FlatStyle.Flat,
+        var b = new Button { Size = new(180, 36), Location = new(0, idx * 38), FlatStyle = FlatStyle.Flat,
             BackColor = Theme.Panel, ForeColor = Theme.Muted, Font = Theme.Main, Cursor = Cursors.Hand,
             TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(18, 0, 0, 0) };
         b.FlatAppearance.BorderSize = 0;
